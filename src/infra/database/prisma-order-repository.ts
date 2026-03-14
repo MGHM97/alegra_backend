@@ -1,8 +1,9 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from './prisma-client.js';
-import type { OrderEntity } from '../../domain/entities/order.js';
+import type { OrderEntity, OrderWithProductsEntity } from '../../domain/entities/order.js';
 import type {
   CreateOrderInput,
+  OrderListFilters,
   OrderRepository,
 } from '../../domain/repositories/order-repository.js';
 import { InsufficientStockError } from '../../domain/errors/app-error.js';
@@ -13,6 +14,21 @@ const orderInclude = {
   items: true,
 } as const;
 
+const orderWithProductsInclude = {
+  items: {
+    include: {
+      product: {
+        select: {
+          name: true,
+          slug: true,
+          thumbnailUrl: true,
+          images: true,
+        },
+      },
+    },
+  },
+} as const;
+
 export class PrismaOrderRepository implements OrderRepository {
   async findById(id: string): Promise<OrderEntity | null> {
     const order = await prisma.order.findUnique({
@@ -20,6 +36,14 @@ export class PrismaOrderRepository implements OrderRepository {
       include: orderInclude,
     });
     return order as OrderEntity | null;
+  }
+
+  async findByIdWithProducts(id: string): Promise<OrderWithProductsEntity | null> {
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: orderWithProductsInclude,
+    });
+    return order as OrderWithProductsEntity | null;
   }
 
   async findByIdempotencyKey(key: string): Promise<OrderEntity | null> {
@@ -37,6 +61,34 @@ export class PrismaOrderRepository implements OrderRepository {
       orderBy: { createdAt: 'desc' },
     });
     return orders as OrderEntity[];
+  }
+
+  async findByUserIdWithProducts(
+    userId: string,
+    filters?: OrderListFilters,
+  ): Promise<OrderWithProductsEntity[]> {
+    const where: Prisma.OrderWhereInput = { userId };
+
+    if (filters?.period) {
+      const since = new Date();
+      since.setMonth(since.getMonth() - filters.period);
+      where.createdAt = { gte: since };
+    }
+
+    if (filters?.search) {
+      const searchTerm = filters.search.trim();
+      where.OR = [
+        { id: { contains: searchTerm, mode: 'insensitive' } },
+        { items: { some: { product: { name: { contains: searchTerm, mode: 'insensitive' } } } } },
+      ];
+    }
+
+    const orders = await prisma.order.findMany({
+      where,
+      include: orderWithProductsInclude,
+      orderBy: { createdAt: 'desc' },
+    });
+    return orders as unknown as OrderWithProductsEntity[];
   }
 
   async create(data: CreateOrderInput): Promise<OrderEntity> {

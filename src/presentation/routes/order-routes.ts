@@ -1,5 +1,9 @@
 import type { FastifyInstance } from 'fastify';
-import { createOrderHandler, listUserOrdersHandler } from '../controllers/order-controller.js';
+import {
+  createOrderHandler,
+  listUserOrdersHandler,
+  getOrderDetailHandler,
+} from '../controllers/order-controller.js';
 import { createOrderSchema } from '../schemas/order-schemas.js';
 import { validateBody } from '../../shared/middlewares/validate.js';
 import { authGuard } from '../../shared/middlewares/auth-guard.js';
@@ -14,5 +18,9 @@ export async function orderRoutes(fastify: FastifyInstance): Promise<void> {
 
   fastify.get('/', {
     handler: listUserOrdersHandler,
+  });
+
+  fastify.get('/:id', {
+    handler: getOrderDetailHandler,
   });
 }

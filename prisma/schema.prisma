@@ -23,6 +23,24 @@ enum OrderStatus {
   REFUNDED
 }
 
+enum CardBrand {
+  VISA
+  MASTERCARD
+  ELO
+  AMEX
+  HIPERCARD
+}
+
+enum CardType {
+  CREDIT
+  DEBIT
+}
+
+enum AddressType {
+  HOME
+  WORK
+}
+
 enum InventoryAction {
   RESTOCK
   SALE
@@ -45,6 +63,9 @@ model User {
 
   orders        Order[]
   refreshTokens RefreshToken[]
+  addresses     Address[]
+  savedCards    SavedCard[]
+  reviews       Review[]
 
   @@map("users")
 }
@@ -91,6 +112,7 @@ model Product {
 
   orderItems    OrderItem[]
   inventoryLogs InventoryLog[]
+  reviews       Review[]
 
   @@index([category])
   @@index([slug])
@@ -99,15 +121,26 @@ model Product {
 }
 
 model Order {
-  id             String      @id @default(uuid())
-  userId         String      @map("user_id")
-  status         OrderStatus @default(PENDING)
-  totalAmount    Decimal     @map("total_amount") @db.Decimal(12, 2)
-  idempotencyKey String?     @unique @map("idempotency_key")
-  reservedUntil  DateTime?   @map("reserved_until")
-  notes          String?
-  createdAt      DateTime    @default(now()) @map("created_at")
-  updatedAt      DateTime    @updatedAt @map("updated_at")
+  id                String      @id @default(uuid())
+  userId            String      @map("user_id")
+  status            OrderStatus @default(PENDING)
+  totalAmount       Decimal     @map("total_amount") @db.Decimal(12, 2)
+  idempotencyKey    String?     @unique @map("idempotency_key")
+  reservedUntil     DateTime?   @map("reserved_until")
+  notes             String?
+  shippingName      String?     @map("shipping_name")
+  shippingStreet    String?     @map("shipping_street")
+  shippingNumber    String?     @map("shipping_number")
+  shippingComplement String?    @map("shipping_complement")
+  shippingNeighborhood String?  @map("shipping_neighborhood")
+  shippingCity      String?     @map("shipping_city")
+  shippingState     String?     @map("shipping_state")
+  shippingZipCode   String?     @map("shipping_zip_code")
+  trackingCode      String?     @map("tracking_code")
+  shippingCarrier   String?     @map("shipping_carrier")
+  deliveredAt       DateTime?   @map("delivered_at")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
 
   user  User        @relation(fields: [userId], references: [id])
   items OrderItem[]
@@ -160,4 +193,73 @@ model IdempotencyRecord {
 
   @@index([expiresAt])
   @@map("idempotency_records")
+}
+
+model Address {
+  id              String      @id @default(uuid())
+  userId          String      @map("user_id")
+  label           String
+  street          String
+  number          String
+  complement      String?
+  neighborhood    String
+  city            String
+  state           String      @db.VarChar(2)
+  zipCode         String      @map("zip_code")
+  additionalInfo  String?     @map("additional_info") @db.VarChar(128)
+  addressType     AddressType @default(HOME) @map("address_type")
+  recipientName   String?     @map("recipient_name")
+  recipientPhone  String?     @map("recipient_phone")
+  isDefault       Boolean     @default(false) @map("is_default")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+model SavedCard {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  lastFourDigits String    @map("last_four_digits") @db.VarChar(4)
+  brand          CardBrand
+  holderName     String    @map("holder_name")
+  expiryMonth    Int       @map("expiry_month")
+  expiryYear     Int       @map("expiry_year")
+  cardType       CardType  @default(CREDIT) @map("card_type")
+  // TODO: In production, card numbers must NEVER be stored. Use a payment gateway tokenization.
+  // Storing full number here only for development/mock purposes.
+  cardNumber     String?   @map("card_number")
+  holderDocument String?   @map("holder_document")
+  issuer         String?   @db.VarChar(100)
+  isDefault      Boolean   @default(false) @map("is_default")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("saved_cards")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  productId String   @map("product_id")
+  userName  String   @map("user_name")
+  rating    Int      @db.SmallInt
+  comment   String
+  photos    String[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([productId])
+  @@index([userId])
+  @@map("reviews")
 }

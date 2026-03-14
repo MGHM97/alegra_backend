@@ -16,8 +16,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'baloes',
     subcategory: 'metalicos',
-    images: ['https://picsum.photos/seed/baloes1/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/baloes1/300/300',
+    images: [
+      'https://picsum.photos/seed/baloes1a/600/600',
+      'https://picsum.photos/seed/baloes1b/600/600',
+      'https://picsum.photos/seed/baloes1c/600/600',
+      'https://picsum.photos/seed/baloes1d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/baloes1a/300/300',
     badges: ['mais-vendido', 'promocao'],
     specifications: {
       Material: 'Látex metalizado',
@@ -44,8 +49,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'descartaveis',
     subcategory: 'conjuntos',
-    images: ['https://picsum.photos/seed/desc1/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/desc1/300/300',
+    images: [
+      'https://picsum.photos/seed/desc1a/600/600',
+      'https://picsum.photos/seed/desc1b/600/600',
+      'https://picsum.photos/seed/desc1c/600/600',
+      'https://picsum.photos/seed/desc1d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/desc1a/300/300',
     badges: ['novo'],
     specifications: {
       Material: 'Plástico rígido PP',
@@ -72,8 +82,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'decoracao',
     subcategory: 'cortinas',
-    images: ['https://picsum.photos/seed/cortina1/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/cortina1/300/300',
+    images: [
+      'https://picsum.photos/seed/cortina1a/600/600',
+      'https://picsum.photos/seed/cortina1b/600/600',
+      'https://picsum.photos/seed/cortina1c/600/600',
+      'https://picsum.photos/seed/cortina1d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/cortina1a/300/300',
     badges: ['mais-vendido'],
     specifications: {
       Material: 'PET metalizado',
@@ -100,8 +115,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'kits',
     subcategory: 'tematicos',
-    images: ['https://picsum.photos/seed/kit1/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/kit1/300/300',
+    images: [
+      'https://picsum.photos/seed/kit1a/600/600',
+      'https://picsum.photos/seed/kit1b/600/600',
+      'https://picsum.photos/seed/kit1c/600/600',
+      'https://picsum.photos/seed/kit1d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/kit1a/300/300',
     badges: ['promocao', 'mais-vendido'],
     specifications: {
       Convidados: '16 pessoas',
@@ -128,8 +148,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'doces',
     subcategory: 'forminhas',
-    images: ['https://picsum.photos/seed/forminha1/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/forminha1/300/300',
+    images: [
+      'https://picsum.photos/seed/forminha1a/600/600',
+      'https://picsum.photos/seed/forminha1b/600/600',
+      'https://picsum.photos/seed/forminha1c/600/600',
+      'https://picsum.photos/seed/forminha1d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/forminha1a/300/300',
     badges: ['exclusivo'],
     specifications: {
       Material: 'Papel laminado',
@@ -156,8 +181,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'velas',
     subcategory: null,
-    images: ['https://picsum.photos/seed/vela1/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/vela1/300/300',
+    images: [
+      'https://picsum.photos/seed/vela1a/600/600',
+      'https://picsum.photos/seed/vela1b/600/600',
+      'https://picsum.photos/seed/vela1c/600/600',
+      'https://picsum.photos/seed/vela1d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/vela1a/300/300',
     badges: ['novo'],
     specifications: {
       Altura: '12cm',
@@ -184,8 +214,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'convites',
     subcategory: 'impressos',
-    images: ['https://picsum.photos/seed/convite1/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/convite1/300/300',
+    images: [
+      'https://picsum.photos/seed/convite1a/600/600',
+      'https://picsum.photos/seed/convite1b/600/600',
+      'https://picsum.photos/seed/convite1c/600/600',
+      'https://picsum.photos/seed/convite1d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/convite1a/300/300',
     badges: [],
     specifications: {
       Papel: 'Couchê 300g',
@@ -212,8 +247,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'fantasias',
     subcategory: 'infantil',
-    images: ['https://picsum.photos/seed/fantasia1/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/fantasia1/300/300',
+    images: [
+      'https://picsum.photos/seed/fantasia1a/600/600',
+      'https://picsum.photos/seed/fantasia1b/600/600',
+      'https://picsum.photos/seed/fantasia1c/600/600',
+      'https://picsum.photos/seed/fantasia1d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/fantasia1a/300/300',
     badges: ['promocao'],
     specifications: {
       Material: 'Poliéster e tule',
@@ -240,8 +280,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'acessorios',
     subcategory: 'luminosos',
-    images: ['https://picsum.photos/seed/oculos1/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/oculos1/300/300',
+    images: [
+      'https://picsum.photos/seed/oculos1a/600/600',
+      'https://picsum.photos/seed/oculos1b/600/600',
+      'https://picsum.photos/seed/oculos1c/600/600',
+      'https://picsum.photos/seed/oculos1d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/oculos1a/300/300',
     badges: ['mais-vendido', 'novo'],
     specifications: {
       Quantidade: '10 unidades',
@@ -268,8 +313,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'personalizados',
     subcategory: 'faixas',
-    images: ['https://picsum.photos/seed/faixa1/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/faixa1/300/300',
+    images: [
+      'https://picsum.photos/seed/faixa1a/600/600',
+      'https://picsum.photos/seed/faixa1b/600/600',
+      'https://picsum.photos/seed/faixa1c/600/600',
+      'https://picsum.photos/seed/faixa1d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/faixa1a/300/300',
     badges: ['exclusivo'],
     specifications: {
       Material: 'TNT laminado',
@@ -298,8 +348,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'baloes',
     subcategory: 'perolados',
-    images: ['https://picsum.photos/seed/baloes2/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/baloes2/300/300',
+    images: [
+      'https://picsum.photos/seed/baloes2a/600/600',
+      'https://picsum.photos/seed/baloes2b/600/600',
+      'https://picsum.photos/seed/baloes2c/600/600',
+      'https://picsum.photos/seed/baloes2d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/baloes2a/300/300',
     badges: ['novo'],
     specifications: {
       Material: 'Látex natural perolado',
@@ -326,8 +381,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'baloes',
     subcategory: 'gigantes',
-    images: ['https://picsum.photos/seed/baloes3/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/baloes3/300/300',
+    images: [
+      'https://picsum.photos/seed/baloes3a/600/600',
+      'https://picsum.photos/seed/baloes3b/600/600',
+      'https://picsum.photos/seed/baloes3c/600/600',
+      'https://picsum.photos/seed/baloes3d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/baloes3a/300/300',
     badges: ['promocao'],
     specifications: {
       Material: 'Látex cristal',
@@ -354,8 +414,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'baloes',
     subcategory: 'arcos',
-    images: ['https://picsum.photos/seed/baloes4/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/baloes4/300/300',
+    images: [
+      'https://picsum.photos/seed/baloes4a/600/600',
+      'https://picsum.photos/seed/baloes4b/600/600',
+      'https://picsum.photos/seed/baloes4c/600/600',
+      'https://picsum.photos/seed/baloes4d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/baloes4a/300/300',
     badges: ['mais-vendido', 'promocao'],
     specifications: {
       Material: 'Látex premium',
@@ -382,8 +447,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'baloes',
     subcategory: 'metalicos',
-    images: ['https://picsum.photos/seed/baloes5/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/baloes5/300/300',
+    images: [
+      'https://picsum.photos/seed/baloes5a/600/600',
+      'https://picsum.photos/seed/baloes5b/600/600',
+      'https://picsum.photos/seed/baloes5c/600/600',
+      'https://picsum.photos/seed/baloes5d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/baloes5a/300/300',
     badges: [],
     specifications: {
       Material: 'Filme metalizado (mylar)',
@@ -412,8 +482,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'descartaveis',
     subcategory: 'guardanapos',
-    images: ['https://picsum.photos/seed/desc2/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/desc2/300/300',
+    images: [
+      'https://picsum.photos/seed/desc2a/600/600',
+      'https://picsum.photos/seed/desc2b/600/600',
+      'https://picsum.photos/seed/desc2c/600/600',
+      'https://picsum.photos/seed/desc2d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/desc2a/300/300',
     badges: ['novo'],
     specifications: {
       Material: 'Papel tripla camada',
@@ -440,8 +515,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'descartaveis',
     subcategory: 'talheres',
-    images: ['https://picsum.photos/seed/desc3/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/desc3/300/300',
+    images: [
+      'https://picsum.photos/seed/desc3a/600/600',
+      'https://picsum.photos/seed/desc3b/600/600',
+      'https://picsum.photos/seed/desc3c/600/600',
+      'https://picsum.photos/seed/desc3d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/desc3a/300/300',
     badges: ['promocao'],
     specifications: {
       Material: 'PS rígido metalizado',
@@ -468,8 +548,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'descartaveis',
     subcategory: 'canudos',
-    images: ['https://picsum.photos/seed/desc4/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/desc4/300/300',
+    images: [
+      'https://picsum.photos/seed/desc4a/600/600',
+      'https://picsum.photos/seed/desc4b/600/600',
+      'https://picsum.photos/seed/desc4c/600/600',
+      'https://picsum.photos/seed/desc4d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/desc4a/300/300',
     badges: ['exclusivo'],
     specifications: {
       Material: 'Papel kraft biodegradável',
@@ -496,8 +581,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'descartaveis',
     subcategory: 'toalhas',
-    images: ['https://picsum.photos/seed/desc5/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/desc5/300/300',
+    images: [
+      'https://picsum.photos/seed/desc5a/600/600',
+      'https://picsum.photos/seed/desc5b/600/600',
+      'https://picsum.photos/seed/desc5c/600/600',
+      'https://picsum.photos/seed/desc5d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/desc5a/300/300',
     badges: ['mais-vendido'],
     specifications: {
       Material: 'TNT laminado',
@@ -526,8 +616,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'decoracao',
     subcategory: 'papel',
-    images: ['https://picsum.photos/seed/deco2/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/deco2/300/300',
+    images: [
+      'https://picsum.photos/seed/deco2a/600/600',
+      'https://picsum.photos/seed/deco2b/600/600',
+      'https://picsum.photos/seed/deco2c/600/600',
+      'https://picsum.photos/seed/deco2d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/deco2a/300/300',
     badges: ['mais-vendido'],
     specifications: {
       Material: 'Papel de seda',
@@ -554,8 +649,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'decoracao',
     subcategory: 'paineis',
-    images: ['https://picsum.photos/seed/deco3/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/deco3/300/300',
+    images: [
+      'https://picsum.photos/seed/deco3a/600/600',
+      'https://picsum.photos/seed/deco3b/600/600',
+      'https://picsum.photos/seed/deco3c/600/600',
+      'https://picsum.photos/seed/deco3d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/deco3a/300/300',
     badges: ['promocao'],
     specifications: {
       Material: 'Metal + tecido sublimado',
@@ -582,8 +682,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'decoracao',
     subcategory: 'luminosos',
-    images: ['https://picsum.photos/seed/deco4/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/deco4/300/300',
+    images: [
+      'https://picsum.photos/seed/deco4a/600/600',
+      'https://picsum.photos/seed/deco4b/600/600',
+      'https://picsum.photos/seed/deco4c/600/600',
+      'https://picsum.photos/seed/deco4d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/deco4a/300/300',
     badges: ['exclusivo'],
     specifications: {
       Material: 'Plástico ABS',
@@ -610,8 +715,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'decoracao',
     subcategory: 'bandeirinhas',
-    images: ['https://picsum.photos/seed/deco5/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/deco5/300/300',
+    images: [
+      'https://picsum.photos/seed/deco5a/600/600',
+      'https://picsum.photos/seed/deco5b/600/600',
+      'https://picsum.photos/seed/deco5c/600/600',
+      'https://picsum.photos/seed/deco5d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/deco5a/300/300',
     badges: ['novo'],
     specifications: {
       Material: 'Juta natural',
@@ -640,8 +750,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'kits',
     subcategory: 'tematicos',
-    images: ['https://picsum.photos/seed/kit2/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/kit2/300/300',
+    images: [
+      'https://picsum.photos/seed/kit2a/600/600',
+      'https://picsum.photos/seed/kit2b/600/600',
+      'https://picsum.photos/seed/kit2c/600/600',
+      'https://picsum.photos/seed/kit2d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/kit2a/300/300',
     badges: ['promocao'],
     specifications: {
       Convidados: '24 pessoas',
@@ -668,8 +783,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'kits',
     subcategory: 'cha-bebe',
-    images: ['https://picsum.photos/seed/kit3/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/kit3/300/300',
+    images: [
+      'https://picsum.photos/seed/kit3a/600/600',
+      'https://picsum.photos/seed/kit3b/600/600',
+      'https://picsum.photos/seed/kit3c/600/600',
+      'https://picsum.photos/seed/kit3d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/kit3a/300/300',
     badges: ['novo'],
     specifications: {
       Convidados: '20 pessoas',
@@ -696,8 +816,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'kits',
     subcategory: 'tematicos',
-    images: ['https://picsum.photos/seed/kit4/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/kit4/300/300',
+    images: [
+      'https://picsum.photos/seed/kit4a/600/600',
+      'https://picsum.photos/seed/kit4b/600/600',
+      'https://picsum.photos/seed/kit4c/600/600',
+      'https://picsum.photos/seed/kit4d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/kit4a/300/300',
     badges: ['exclusivo', 'mais-vendido'],
     specifications: {
       Convidados: '30 pessoas',
@@ -724,8 +849,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'kits',
     subcategory: 'adulto',
-    images: ['https://picsum.photos/seed/kit5/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/kit5/300/300',
+    images: [
+      'https://picsum.photos/seed/kit5a/600/600',
+      'https://picsum.photos/seed/kit5b/600/600',
+      'https://picsum.photos/seed/kit5c/600/600',
+      'https://picsum.photos/seed/kit5d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/kit5a/300/300',
     badges: ['promocao'],
     specifications: {
       Convidados: '20 pessoas',
@@ -754,8 +884,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'doces',
     subcategory: 'cachepots',
-    images: ['https://picsum.photos/seed/doce2/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/doce2/300/300',
+    images: [
+      'https://picsum.photos/seed/doce2a/600/600',
+      'https://picsum.photos/seed/doce2b/600/600',
+      'https://picsum.photos/seed/doce2c/600/600',
+      'https://picsum.photos/seed/doce2d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/doce2a/300/300',
     badges: [],
     specifications: {
       Material: 'Papel cartão 300g',
@@ -782,8 +917,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'doces',
     subcategory: 'embalagens',
-    images: ['https://picsum.photos/seed/doce3/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/doce3/300/300',
+    images: [
+      'https://picsum.photos/seed/doce3a/600/600',
+      'https://picsum.photos/seed/doce3b/600/600',
+      'https://picsum.photos/seed/doce3c/600/600',
+      'https://picsum.photos/seed/doce3d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/doce3a/300/300',
     badges: ['novo'],
     specifications: {
       Material: 'Papel kraft + PVC transparente',
@@ -810,8 +950,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'doces',
     subcategory: 'toppers',
-    images: ['https://picsum.photos/seed/doce4/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/doce4/300/300',
+    images: [
+      'https://picsum.photos/seed/doce4a/600/600',
+      'https://picsum.photos/seed/doce4b/600/600',
+      'https://picsum.photos/seed/doce4c/600/600',
+      'https://picsum.photos/seed/doce4d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/doce4a/300/300',
     badges: ['mais-vendido'],
     specifications: {
       Material: 'Madeira + papel glitter',
@@ -838,8 +983,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'doces',
     subcategory: 'wrappers',
-    images: ['https://picsum.photos/seed/doce5/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/doce5/300/300',
+    images: [
+      'https://picsum.photos/seed/doce5a/600/600',
+      'https://picsum.photos/seed/doce5b/600/600',
+      'https://picsum.photos/seed/doce5c/600/600',
+      'https://picsum.photos/seed/doce5d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/doce5a/300/300',
     badges: ['promocao'],
     specifications: {
       Material: 'Papel couchê vazado',
@@ -868,8 +1018,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'velas',
     subcategory: 'palito',
-    images: ['https://picsum.photos/seed/vela2/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/vela2/300/300',
+    images: [
+      'https://picsum.photos/seed/vela2a/600/600',
+      'https://picsum.photos/seed/vela2b/600/600',
+      'https://picsum.photos/seed/vela2c/600/600',
+      'https://picsum.photos/seed/vela2d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/vela2a/300/300',
     badges: [],
     specifications: {
       Material: 'Parafina colorida',
@@ -896,8 +1051,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'velas',
     subcategory: 'sparkler',
-    images: ['https://picsum.photos/seed/vela3/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/vela3/300/300',
+    images: [
+      'https://picsum.photos/seed/vela3a/600/600',
+      'https://picsum.photos/seed/vela3b/600/600',
+      'https://picsum.photos/seed/vela3c/600/600',
+      'https://picsum.photos/seed/vela3d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/vela3a/300/300',
     badges: ['mais-vendido'],
     specifications: {
       Material: 'Composição pirotécnica (NR)',
@@ -924,8 +1084,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'velas',
     subcategory: null,
-    images: ['https://picsum.photos/seed/vela4/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/vela4/300/300',
+    images: [
+      'https://picsum.photos/seed/vela4a/600/600',
+      'https://picsum.photos/seed/vela4b/600/600',
+      'https://picsum.photos/seed/vela4c/600/600',
+      'https://picsum.photos/seed/vela4d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/vela4a/300/300',
     badges: ['novo', 'exclusivo'],
     specifications: {
       Material: 'Parafina + mecanismo musical',
@@ -952,8 +1117,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'velas',
     subcategory: 'tematicas',
-    images: ['https://picsum.photos/seed/vela5/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/vela5/300/300',
+    images: [
+      'https://picsum.photos/seed/vela5a/600/600',
+      'https://picsum.photos/seed/vela5b/600/600',
+      'https://picsum.photos/seed/vela5c/600/600',
+      'https://picsum.photos/seed/vela5d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/vela5a/300/300',
     badges: ['promocao'],
     specifications: {
       Material: 'Parafina moldada',
@@ -982,8 +1152,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'convites',
     subcategory: 'infantil',
-    images: ['https://picsum.photos/seed/conv2/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/conv2/300/300',
+    images: [
+      'https://picsum.photos/seed/conv2a/600/600',
+      'https://picsum.photos/seed/conv2b/600/600',
+      'https://picsum.photos/seed/conv2c/600/600',
+      'https://picsum.photos/seed/conv2d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/conv2a/300/300',
     badges: [],
     specifications: {
       Papel: 'Couchê 250g brilhante',
@@ -1010,8 +1185,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'convites',
     subcategory: 'digitais',
-    images: ['https://picsum.photos/seed/conv3/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/conv3/300/300',
+    images: [
+      'https://picsum.photos/seed/conv3a/600/600',
+      'https://picsum.photos/seed/conv3b/600/600',
+      'https://picsum.photos/seed/conv3c/600/600',
+      'https://picsum.photos/seed/conv3d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/conv3a/300/300',
     badges: ['mais-vendido', 'exclusivo'],
     specifications: {
       Formato: 'MP4 animado',
@@ -1038,8 +1218,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'convites',
     subcategory: 'casamento',
-    images: ['https://picsum.photos/seed/conv4/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/conv4/300/300',
+    images: [
+      'https://picsum.photos/seed/conv4a/600/600',
+      'https://picsum.photos/seed/conv4b/600/600',
+      'https://picsum.photos/seed/conv4c/600/600',
+      'https://picsum.photos/seed/conv4d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/conv4a/300/300',
     badges: ['novo'],
     specifications: {
       Papel: 'Kraft 350g',
@@ -1066,8 +1251,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'convites',
     subcategory: 'especiais',
-    images: ['https://picsum.photos/seed/conv5/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/conv5/300/300',
+    images: [
+      'https://picsum.photos/seed/conv5a/600/600',
+      'https://picsum.photos/seed/conv5b/600/600',
+      'https://picsum.photos/seed/conv5c/600/600',
+      'https://picsum.photos/seed/conv5d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/conv5a/300/300',
     badges: ['exclusivo'],
     specifications: {
       Papel: 'Couchê 300g + corte a laser',
@@ -1096,8 +1286,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'fantasias',
     subcategory: 'adulto',
-    images: ['https://picsum.photos/seed/fant2/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/fant2/300/300',
+    images: [
+      'https://picsum.photos/seed/fant2a/600/600',
+      'https://picsum.photos/seed/fant2b/600/600',
+      'https://picsum.photos/seed/fant2c/600/600',
+      'https://picsum.photos/seed/fant2d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/fant2a/300/300',
     badges: ['promocao'],
     specifications: {
       Material: 'Poliéster stretch + cetim',
@@ -1124,8 +1319,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'fantasias',
     subcategory: 'infantil',
-    images: ['https://picsum.photos/seed/fant3/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/fant3/300/300',
+    images: [
+      'https://picsum.photos/seed/fant3a/600/600',
+      'https://picsum.photos/seed/fant3b/600/600',
+      'https://picsum.photos/seed/fant3c/600/600',
+      'https://picsum.photos/seed/fant3d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/fant3a/300/300',
     badges: ['mais-vendido'],
     specifications: {
       Material: 'Poliéster + espuma EVA',
@@ -1152,8 +1352,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'fantasias',
     subcategory: 'pet',
-    images: ['https://picsum.photos/seed/fant4/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/fant4/300/300',
+    images: [
+      'https://picsum.photos/seed/fant4a/600/600',
+      'https://picsum.photos/seed/fant4b/600/600',
+      'https://picsum.photos/seed/fant4c/600/600',
+      'https://picsum.photos/seed/fant4d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/fant4a/300/300',
     badges: ['novo', 'exclusivo'],
     specifications: {
       Material: 'Pelúcia + feltro',
@@ -1180,8 +1385,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'fantasias',
     subcategory: 'kits',
-    images: ['https://picsum.photos/seed/fant5/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/fant5/300/300',
+    images: [
+      'https://picsum.photos/seed/fant5a/600/600',
+      'https://picsum.photos/seed/fant5b/600/600',
+      'https://picsum.photos/seed/fant5c/600/600',
+      'https://picsum.photos/seed/fant5d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/fant5a/300/300',
     badges: ['promocao'],
     specifications: {
       Personagens: 'Mágico, Palhaço, Bailarina, Domador',
@@ -1210,8 +1420,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'acessorios',
     subcategory: 'luminosos',
-    images: ['https://picsum.photos/seed/acess2/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/acess2/300/300',
+    images: [
+      'https://picsum.photos/seed/acess2a/600/600',
+      'https://picsum.photos/seed/acess2b/600/600',
+      'https://picsum.photos/seed/acess2c/600/600',
+      'https://picsum.photos/seed/acess2d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/acess2a/300/300',
     badges: ['novo'],
     specifications: {
       Quantidade: '5 tiaras',
@@ -1238,8 +1453,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'acessorios',
     subcategory: 'chapeus',
-    images: ['https://picsum.photos/seed/acess3/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/acess3/300/300',
+    images: [
+      'https://picsum.photos/seed/acess3a/600/600',
+      'https://picsum.photos/seed/acess3b/600/600',
+      'https://picsum.photos/seed/acess3c/600/600',
+      'https://picsum.photos/seed/acess3d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/acess3a/300/300',
     badges: ['mais-vendido'],
     specifications: {
       Material: 'Papel cartão holográfico',
@@ -1266,8 +1486,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'acessorios',
     subcategory: 'apitos',
-    images: ['https://picsum.photos/seed/acess4/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/acess4/300/300',
+    images: [
+      'https://picsum.photos/seed/acess4a/600/600',
+      'https://picsum.photos/seed/acess4b/600/600',
+      'https://picsum.photos/seed/acess4c/600/600',
+      'https://picsum.photos/seed/acess4d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/acess4a/300/300',
     badges: [],
     specifications: {
       Material: 'Papel metalizado + plástico',
@@ -1294,8 +1519,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'acessorios',
     subcategory: 'photo-booth',
-    images: ['https://picsum.photos/seed/acess5/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/acess5/300/300',
+    images: [
+      'https://picsum.photos/seed/acess5a/600/600',
+      'https://picsum.photos/seed/acess5b/600/600',
+      'https://picsum.photos/seed/acess5c/600/600',
+      'https://picsum.photos/seed/acess5d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/acess5a/300/300',
     badges: ['exclusivo', 'mais-vendido'],
     specifications: {
       Material: 'Papel couchê 300g + palito de madeira',
@@ -1324,8 +1554,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'personalizados',
     subcategory: 'topos-de-bolo',
-    images: ['https://picsum.photos/seed/pers2/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/pers2/300/300',
+    images: [
+      'https://picsum.photos/seed/pers2a/600/600',
+      'https://picsum.photos/seed/pers2b/600/600',
+      'https://picsum.photos/seed/pers2c/600/600',
+      'https://picsum.photos/seed/pers2d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/pers2a/300/300',
     badges: ['mais-vendido'],
     specifications: {
       Material: 'Acrílico espelhado 2mm',
@@ -1352,8 +1587,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'personalizados',
     subcategory: 'lembrancinhas',
-    images: ['https://picsum.photos/seed/pers3/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/pers3/300/300',
+    images: [
+      'https://picsum.photos/seed/pers3a/600/600',
+      'https://picsum.photos/seed/pers3b/600/600',
+      'https://picsum.photos/seed/pers3c/600/600',
+      'https://picsum.photos/seed/pers3d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/pers3a/300/300',
     badges: ['novo'],
     specifications: {
       Material: 'Papel couchê 300g + cetim',
@@ -1380,8 +1620,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'personalizados',
     subcategory: 'rotulos',
-    images: ['https://picsum.photos/seed/pers4/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/pers4/300/300',
+    images: [
+      'https://picsum.photos/seed/pers4a/600/600',
+      'https://picsum.photos/seed/pers4b/600/600',
+      'https://picsum.photos/seed/pers4c/600/600',
+      'https://picsum.photos/seed/pers4d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/pers4a/300/300',
     badges: ['exclusivo'],
     specifications: {
       Material: 'Vinil adesivo à prova d\'água',
@@ -1408,8 +1653,13 @@ const PRODUCTS = [
     currency: 'BRL',
     category: 'personalizados',
     subcategory: 'paineis',
-    images: ['https://picsum.photos/seed/pers5/600/600'],
-    thumbnailUrl: 'https://picsum.photos/seed/pers5/300/300',
+    images: [
+      'https://picsum.photos/seed/pers5a/600/600',
+      'https://picsum.photos/seed/pers5b/600/600',
+      'https://picsum.photos/seed/pers5c/600/600',
+      'https://picsum.photos/seed/pers5d/600/600',
+    ],
+    thumbnailUrl: 'https://picsum.photos/seed/pers5a/300/300',
     badges: ['promocao'],
     specifications: {
       Material: 'MDF branco 3mm + moldura',
@@ -1430,7 +1680,7 @@ async function main() {
   console.log('Seeding database...');
 
   const adminPasswordHash = await bcrypt.hash('Admin@123456', 12);
-  await prisma.user.upsert({
+  const admin = await prisma.user.upsert({
     where: { email: 'admin@alegrafestas.com.br' },
     update: {},
     create: {
@@ -1446,7 +1696,10 @@ async function main() {
   for (const product of PRODUCTS) {
     await prisma.product.upsert({
       where: { id: product.id },
-      update: {},
+      update: {
+        images: [...product.images],
+        thumbnailUrl: product.thumbnailUrl,
+      },
       create: {
         id: product.id,
         name: product.name,
@@ -1472,6 +1725,294 @@ async function main() {
     });
   }
   console.log(`  ${PRODUCTS.length} products seeded`);
+
+  // --- Seed Addresses for Admin ---
+  const existingAddresses = await prisma.address.count({ where: { userId: admin.id } });
+  if (existingAddresses === 0) {
+    await prisma.address.createMany({
+      data: [
+        {
+          userId: admin.id,
+          label: 'Casa',
+          street: 'Rua das Flores',
+          number: '123',
+          complement: 'Apto 45',
+          neighborhood: 'Jardim Primavera',
+          city: 'São Paulo',
+          state: 'SP',
+          zipCode: '01234-567',
+          additionalInfo: 'Edifício verde próximo ao mercado',
+          addressType: 'HOME',
+          recipientName: 'Admin Alegra Festas',
+          recipientPhone: '11999998888',
+          isDefault: true,
+        },
+        {
+          userId: admin.id,
+          label: 'Trabalho',
+          street: 'Avenida Paulista',
+          number: '1000',
+          complement: 'Sala 1201',
+          neighborhood: 'Bela Vista',
+          city: 'São Paulo',
+          state: 'SP',
+          zipCode: '01310-100',
+          additionalInfo: null,
+          addressType: 'WORK',
+          recipientName: 'Admin Alegra Festas',
+          recipientPhone: '11988887777',
+          isDefault: false,
+        },
+      ],
+    });
+    console.log('  2 addresses seeded for admin');
+  }
+
+  // --- Seed Saved Cards for Admin ---
+  const existingCards = await prisma.savedCard.count({ where: { userId: admin.id } });
+  if (existingCards === 0) {
+    await prisma.savedCard.createMany({
+      data: [
+        {
+          userId: admin.id,
+          lastFourDigits: '1234',
+          brand: 'VISA',
+          holderName: 'ADMIN ALEGRA FESTAS',
+          expiryMonth: 12,
+          expiryYear: 2027,
+          cardType: 'CREDIT',
+          cardNumber: '4111111111111234',
+          holderDocument: '12345678901',
+          issuer: 'Nubank',
+          isDefault: true,
+        },
+        {
+          userId: admin.id,
+          lastFourDigits: '5678',
+          brand: 'MASTERCARD',
+          holderName: 'ADMIN ALEGRA FESTAS',
+          expiryMonth: 6,
+          expiryYear: 2026,
+          cardType: 'DEBIT',
+          cardNumber: '5500000000005678',
+          holderDocument: '12345678901',
+          issuer: 'Itaú Unibanco',
+          isDefault: false,
+        },
+      ],
+    });
+    console.log('  2 saved cards seeded for admin');
+  }
+
+  // --- Seed Orders for Admin ---
+  const existingOrders = await prisma.order.count({ where: { userId: admin.id } });
+  if (existingOrders === 0) {
+    // Order 1: Delivered (2 months ago)
+    const twoMonthsAgo = new Date();
+    twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+    const delivered1Week = new Date(twoMonthsAgo);
+    delivered1Week.setDate(delivered1Week.getDate() + 7);
+
+    await prisma.order.create({
+      data: {
+        userId: admin.id,
+        status: 'DELIVERED',
+        totalAmount: 174.7, // kit baloes 49.9 + kit unicornio 129.9 - but using 2 items
+        shippingName: 'Admin Alegra Festas',
+        shippingStreet: 'Rua das Flores',
+        shippingNumber: '123',
+        shippingComplement: 'Apto 45',
+        shippingNeighborhood: 'Jardim Primavera',
+        shippingCity: 'São Paulo',
+        shippingState: 'SP',
+        shippingZipCode: '01234-567',
+        trackingCode: 'BR123456789XX',
+        shippingCarrier: 'Correios',
+        deliveredAt: delivered1Week,
+        createdAt: twoMonthsAgo,
+        items: {
+          create: [
+            {
+              productId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', // Kit Baloes
+              quantity: 1,
+              unitPrice: 49.9,
+              total: 49.9,
+            },
+            {
+              productId: 'd4e5f6a7-b8c9-0123-def0-234567890123', // Kit Unicornio
+              quantity: 1,
+              unitPrice: 129.9,
+              total: 129.9,
+            },
+          ],
+        },
+      },
+    });
+
+    // Order 2: Shipped (1 week ago)
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    await prisma.order.create({
+      data: {
+        userId: admin.id,
+        status: 'SHIPPED',
+        totalAmount: 89.9,
+        shippingName: 'Admin Alegra Festas',
+        shippingStreet: 'Avenida Paulista',
+        shippingNumber: '1000',
+        shippingComplement: 'Sala 1201',
+        shippingNeighborhood: 'Bela Vista',
+        shippingCity: 'São Paulo',
+        shippingState: 'SP',
+        shippingZipCode: '01310-100',
+        trackingCode: 'BR987654321YY',
+        shippingCarrier: 'Correios',
+        createdAt: oneWeekAgo,
+        items: {
+          create: [
+            {
+              productId: 'b2c3d4e5-f6a7-8901-bcde-f12345678901', // Pratos e Copos
+              quantity: 1,
+              unitPrice: 89.9,
+              total: 89.9,
+            },
+          ],
+        },
+      },
+    });
+
+    // Order 3: Processing (2 days ago)
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+
+    await prisma.order.create({
+      data: {
+        userId: admin.id,
+        status: 'PROCESSING',
+        totalAmount: 128.7,
+        shippingName: 'Admin Alegra Festas',
+        shippingStreet: 'Rua das Flores',
+        shippingNumber: '123',
+        shippingComplement: 'Apto 45',
+        shippingNeighborhood: 'Jardim Primavera',
+        shippingCity: 'São Paulo',
+        shippingState: 'SP',
+        shippingZipCode: '01234-567',
+        createdAt: twoDaysAgo,
+        items: {
+          create: [
+            {
+              productId: 'c3d4e5f6-a7b8-9012-cdef-123456789012', // Cortina Metalizada
+              quantity: 2,
+              unitPrice: 24.9,
+              total: 49.8,
+            },
+            {
+              productId: 'f6a7b8c9-d0e1-2345-f012-456789012345', // Vela Glitter
+              quantity: 1,
+              unitPrice: 18.9,
+              total: 18.9,
+            },
+            {
+              productId: 'c9d0e1f2-a3b4-5678-2345-789012345678', // Oculos Neon
+              quantity: 1,
+              unitPrice: 59.9,
+              total: 59.9,
+            },
+          ],
+        },
+      },
+    });
+
+    // Order 4: Confirmed (today)
+    await prisma.order.create({
+      data: {
+        userId: admin.id,
+        status: 'CONFIRMED',
+        totalAmount: 79.9,
+        shippingName: 'Admin Alegra Festas',
+        shippingStreet: 'Rua das Flores',
+        shippingNumber: '123',
+        shippingComplement: 'Apto 45',
+        shippingNeighborhood: 'Jardim Primavera',
+        shippingCity: 'São Paulo',
+        shippingState: 'SP',
+        shippingZipCode: '01234-567',
+        items: {
+          create: [
+            {
+              productId: 'e5f6a7b8-c9d0-1234-ef01-345678901234', // Forminhas Douradas
+              quantity: 1,
+              unitPrice: 34.9,
+              total: 34.9,
+            },
+            {
+              productId: 'a7b8c9d0-e1f2-3456-0123-567890123456', // Convites Tropical
+              quantity: 1,
+              unitPrice: 42.0,
+              total: 42.0,
+            },
+          ],
+        },
+      },
+    });
+
+    console.log('  4 orders seeded for admin');
+  }
+
+  // --- Seed Reviews ---
+  const existingReviews = await prisma.review.count();
+  if (existingReviews === 0) {
+    await prisma.review.createMany({
+      data: [
+        {
+          userId: admin.id,
+          productId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+          userName: 'Admin',
+          rating: 5,
+          comment: 'Baloes lindos! Chegaram bem embalados e o acabamento metalizado e perfeito. Usei na festa da minha filha e ficou incrivel.',
+          photos: ['https://picsum.photos/seed/review1/200/200'],
+        },
+        {
+          userId: admin.id,
+          productId: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
+          userName: 'Admin',
+          rating: 5,
+          comment: 'Material de alta qualidade, borda dourada linda. Não parecem descartáveis! Perfeitos para o casamento.',
+          photos: ['https://picsum.photos/seed/review4/200/200'],
+        },
+        {
+          userId: admin.id,
+          productId: 'd4e5f6a7-b8c9-0123-def0-234567890123',
+          userName: 'Admin',
+          rating: 4,
+          comment: 'Kit muito completo e bonito. Minha filha amou o tema unicornio. Unica ressalva e que os copos sao um pouco finos.',
+          photos: [],
+        },
+        {
+          userId: admin.id,
+          productId: 'c3d4e5f6-a7b8-9012-cdef-123456789012',
+          userName: 'Admin',
+          rating: 5,
+          comment: 'Cortina linda! A cor rosa gold e exatamente como nas fotos. Fita adesiva inclusa facilita muito a montagem.',
+          photos: [
+            'https://picsum.photos/seed/review5a/200/200',
+            'https://picsum.photos/seed/review5b/200/200',
+          ],
+        },
+        {
+          userId: admin.id,
+          productId: 'e5f6a7b8-c9d0-1234-ef01-345678901234',
+          userName: 'Admin',
+          rating: 5,
+          comment: 'Forminhas perfeitas para brigadeiro gourmet. Acabamento impecavel, papel resistente. Recomendo!',
+          photos: [],
+        },
+      ],
+    });
+    console.log('  5 reviews seeded');
+  }
 
   console.log('Seed completed successfully!');
 }
