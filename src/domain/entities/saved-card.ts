@@ -10,7 +10,6 @@ export interface SavedCardEntity {
   expiryMonth: number;
   expiryYear: number;
   cardType: CardType;
-  cardNumber: string | null;
   holderDocument: string | null;
   issuer: string | null;
   isDefault: boolean;

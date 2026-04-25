@@ -38,7 +38,6 @@ export class PrismaSavedCardRepository implements SavedCardRepository {
           expiryMonth: data.expiryMonth,
           expiryYear: data.expiryYear,
           cardType: data.cardType ?? 'CREDIT',
-          cardNumber: data.cardNumber ?? null,
           holderDocument: data.holderDocument ?? null,
           issuer: data.issuer ?? null,
           isDefault: data.isDefault ?? false,

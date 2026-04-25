@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../infra/database/prisma-client.js';
 import { NotFoundError, InsufficientStockError } from '../../domain/errors/app-error.js';
 import type { InventorySyncInput } from '../../presentation/schemas/inventory-schemas.js';
+import { releaseCouponUsage } from './coupon-service.js';
 
 interface StockInfo {
   productId: string;
@@ -195,6 +196,10 @@ export class InventoryService {
               reason: `Expired reservation for order ${order.id}`,
             },
           });
+        }
+
+        if (order.couponId) {
+          await releaseCouponUsage(tx, order.couponId);
         }
 
         await tx.order.update({

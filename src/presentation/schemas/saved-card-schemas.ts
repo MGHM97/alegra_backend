@@ -4,9 +4,6 @@ const cardBrandSchema = z.enum(['VISA', 'MASTERCARD', 'ELO', 'AMEX', 'HIPERCARD'
 const cardTypeSchema = z.enum(['CREDIT', 'DEBIT']);
 
 export const createSavedCardSchema = z.object({
-  cardNumber: z.string()
-    .regex(/^\d{13,19}$/, 'Card number must be 13-19 digits')
-    .optional(),
   lastFourDigits: z.string().length(4, 'Must be exactly 4 digits').regex(/^\d{4}$/, 'Must be numeric'),
   brand: cardBrandSchema,
   holderName: z.string().min(1, 'Holder name is required').max(100),
@@ -18,7 +15,16 @@ export const createSavedCardSchema = z.object({
     .optional(),
   issuer: z.string().max(100).optional(),
   isDefault: z.boolean().optional(),
-});
+}).refine(
+  (data) => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    return data.expiryYear > currentYear ||
+      (data.expiryYear === currentYear && data.expiryMonth >= currentMonth);
+  },
+  { message: 'Cartao expirado. Informe uma data de validade futura.', path: ['expiryMonth'] },
+);
 
 export type CreateSavedCardInput = z.infer<typeof createSavedCardSchema>;
 

@@ -8,7 +8,6 @@ export interface CreateSavedCardInput {
   expiryMonth: number;
   expiryYear: number;
   cardType?: CardType;
-  cardNumber?: string;
   holderDocument?: string;
   issuer?: string;
   isDefault?: boolean;
