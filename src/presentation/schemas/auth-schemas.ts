@@ -43,3 +43,34 @@ export const loginSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+
+export const updateProfileSchema = z.object({
+  name: z
+    .string()
+    .min(2, 'Nome deve ter no minimo 2 caracteres')
+    .max(100)
+    .transform((v) => v.trim())
+    .optional(),
+  phone: z
+    .string()
+    .regex(/^\d{10,11}$/, 'Telefone deve ter 10 ou 11 digitos')
+    .optional(),
+});
+
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+/**
+ * Schema para DELETE /v1/auth/me — exige confirmação por senha.
+ *
+ * A senha é re-verificada server-side via bcrypt.compare como camada
+ * adicional de proteção contra deleção acidental ou via token roubado
+ * (Zero-Trust: o JWT autentica, mas a senha confirma a intenção).
+ */
+export const deleteAccountSchema = z.object({
+  password: z
+    .string()
+    .min(1, 'Senha é obrigatória para confirmar a exclusão.')
+    .max(128),
+});
+
+export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
