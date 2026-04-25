@@ -2,10 +2,12 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from './prisma-client.js';
 import type { ProductEntity, ProductListItem } from '../../domain/entities/product.js';
 import type {
+  CreateProductInput,
   CursorPaginationParams,
   PaginatedResult,
   ProductFilters,
   ProductRepository,
+  UpdateProductInput,
 } from '../../domain/repositories/product-repository.js';
 
 export class PrismaProductRepository implements ProductRepository {
@@ -96,5 +98,66 @@ export class PrismaProductRepository implements ProductRepository {
 
     if (!product) return 0;
     return product.stock - product.reservedStock;
+  }
+
+  async create(data: CreateProductInput): Promise<ProductEntity> {
+    const product = await prisma.product.create({
+      data: {
+        name: data.name,
+        slug: data.slug,
+        description: data.description,
+        shortDescription: data.shortDescription,
+        price: data.price,
+        originalPrice: data.originalPrice ?? null,
+        currency: data.currency ?? 'BRL',
+        category: data.category,
+        subcategory: data.subcategory ?? null,
+        images: data.images,
+        thumbnailUrl: data.thumbnailUrl,
+        badges: data.badges ?? [],
+        specifications: (data.specifications ?? {}) as Prisma.InputJsonValue,
+        stock: data.stock,
+        sku: data.sku,
+        weight: data.weight,
+        isActive: data.isActive ?? true,
+        maxInstallments: data.maxInstallments ?? 1,
+        installmentPrice: data.installmentPrice ?? null,
+      },
+    });
+    return product as unknown as ProductEntity;
+  }
+
+  async update(id: string, data: UpdateProductInput): Promise<ProductEntity> {
+    const updateData: Prisma.ProductUpdateInput = {};
+
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.slug !== undefined) updateData.slug = data.slug;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.shortDescription !== undefined) updateData.shortDescription = data.shortDescription;
+    if (data.price !== undefined) updateData.price = data.price;
+    if (data.originalPrice !== undefined) updateData.originalPrice = data.originalPrice;
+    if (data.currency !== undefined) updateData.currency = data.currency;
+    if (data.category !== undefined) updateData.category = data.category;
+    if (data.subcategory !== undefined) updateData.subcategory = data.subcategory;
+    if (data.images !== undefined) updateData.images = data.images;
+    if (data.thumbnailUrl !== undefined) updateData.thumbnailUrl = data.thumbnailUrl;
+    if (data.badges !== undefined) updateData.badges = data.badges;
+    if (data.specifications !== undefined) updateData.specifications = data.specifications as Prisma.InputJsonValue;
+    if (data.stock !== undefined) updateData.stock = data.stock;
+    if (data.sku !== undefined) updateData.sku = data.sku;
+    if (data.weight !== undefined) updateData.weight = data.weight;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    if (data.maxInstallments !== undefined) updateData.maxInstallments = data.maxInstallments;
+    if (data.installmentPrice !== undefined) updateData.installmentPrice = data.installmentPrice;
+
+    const product = await prisma.product.update({
+      where: { id },
+      data: updateData,
+    });
+    return product as unknown as ProductEntity;
+  }
+
+  async delete(id: string): Promise<void> {
+    await prisma.product.delete({ where: { id } });
   }
 }

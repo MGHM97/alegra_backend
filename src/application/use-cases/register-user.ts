@@ -35,6 +35,7 @@ export class RegisterUserUseCase {
       email: user.email,
       username: user.username,
       name: user.name,
+      phone: user.phone,
       role: user.role,
       isActive: user.isActive,
       createdAt: user.createdAt,
