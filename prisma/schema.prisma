@@ -50,24 +50,62 @@ enum InventoryAction {
   SYNC
 }
 
+enum CouponDiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum PaymentMethod {
+  PIX
+  CARD
+  SAVED_CARD
+  BOLETO
+}
+
+enum PaymentStatus {
+  PENDING
+  REQUIRES_ACTION
+  REQUIRES_CONFIRMATION
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  username     String   @unique
-  passwordHash String   @map("password_hash")
+  id           String    @id @default(uuid())
+  email        String    @unique
+  username     String    @unique
+  passwordHash String    @map("password_hash")
   name         String
-  role         UserRole @default(CUSTOMER)
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  phone        String?
+  role         UserRole  @default(CUSTOMER)
+  isActive     Boolean   @default(true) @map("is_active")
+  deletedAt    DateTime? @map("deleted_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  orders        Order[]
-  refreshTokens RefreshToken[]
-  addresses     Address[]
-  savedCards    SavedCard[]
-  reviews       Review[]
+  orders              Order[]
+  refreshTokens       RefreshToken[]
+  addresses           Address[]
+  savedCards          SavedCard[]
+  reviews             Review[]
+  passwordResetTokens PasswordResetToken[]
+  wishlist            WishlistItem[]
 
+  @@index([deletedAt])
   @@map("users")
+}
+
+model NewsletterSubscriber {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([createdAt])
+  @@map("newsletter_subscribers")
 }
 
 model RefreshToken {
@@ -83,6 +121,21 @@ model RefreshToken {
   @@index([userId])
   @@index([token])
   @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tokenHash String   @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("password_reset_tokens")
 }
 
 model Product {
@@ -113,6 +166,7 @@ model Product {
   orderItems    OrderItem[]
   inventoryLogs InventoryLog[]
   reviews       Review[]
+  wishlistedBy  WishlistItem[]
 
   @@index([category])
   @@index([slug])
@@ -126,6 +180,7 @@ model Order {
   status            OrderStatus @default(PENDING)
   totalAmount       Decimal     @map("total_amount") @db.Decimal(12, 2)
   idempotencyKey    String?     @unique @map("idempotency_key")
+  paymentIntentId   String?     @unique @map("payment_intent_id")
   reservedUntil     DateTime?   @map("reserved_until")
   notes             String?
   shippingName      String?     @map("shipping_name")
@@ -138,17 +193,57 @@ model Order {
   shippingZipCode   String?     @map("shipping_zip_code")
   trackingCode      String?     @map("tracking_code")
   shippingCarrier   String?     @map("shipping_carrier")
+  shippingMethodName String?    @map("shipping_method_name")
+  shippingCost      Decimal?    @map("shipping_cost") @db.Decimal(12, 2)
   deliveredAt       DateTime?   @map("delivered_at")
+  couponId          String?     @map("coupon_id")
+  couponCode        String?     @map("coupon_code")
+  discountAmount    Decimal?    @map("discount_amount") @db.Decimal(12, 2)
+  paymentMethod     PaymentMethod? @map("payment_method")
+  paymentStatus     PaymentStatus? @map("payment_status")
+  pixQrCode         String?     @map("pix_qr_code")
+  pixQrCodeText     String?     @map("pix_qr_code_text")
+  pixExpiresAt      DateTime?   @map("pix_expires_at")
+  boletoUrl         String?     @map("boleto_url")
+  boletoBarcode     String?     @map("boleto_barcode")
+  boletoExpiresAt   DateTime?   @map("boleto_expires_at")
+  savedCardId       String?     @map("saved_card_id")
   createdAt         DateTime    @default(now()) @map("created_at")
   updatedAt         DateTime    @updatedAt @map("updated_at")
 
-  user  User        @relation(fields: [userId], references: [id])
-  items OrderItem[]
+  user   User        @relation(fields: [userId], references: [id])
+  items  OrderItem[]
+  coupon Coupon?     @relation(fields: [couponId], references: [id])
 
   @@index([userId])
   @@index([status])
   @@index([idempotencyKey])
+  @@index([couponId])
+  @@index([createdAt])
+  @@index([status, createdAt])
   @@map("orders")
+}
+
+model Coupon {
+  id              String             @id @default(uuid())
+  code            String             @unique
+  discountType    CouponDiscountType @map("discount_type")
+  discountValue   Decimal            @map("discount_value") @db.Decimal(12, 2)
+  maxUses         Int?               @map("max_uses")
+  usedCount       Int                @default(0) @map("used_count")
+  validFrom       DateTime?          @map("valid_from")
+  validUntil      DateTime?          @map("valid_until")
+  minOrderAmount  Decimal?           @map("min_order_amount") @db.Decimal(12, 2)
+  description     String?            @db.VarChar(255)
+  isActive        Boolean            @default(true) @map("is_active")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  orders Order[]
+
+  @@index([code])
+  @@index([isActive])
+  @@map("coupons")
 }
 
 model OrderItem {
@@ -229,9 +324,6 @@ model SavedCard {
   expiryMonth    Int       @map("expiry_month")
   expiryYear     Int       @map("expiry_year")
   cardType       CardType  @default(CREDIT) @map("card_type")
-  // TODO: In production, card numbers must NEVER be stored. Use a payment gateway tokenization.
-  // Storing full number here only for development/mock purposes.
-  cardNumber     String?   @map("card_number")
   holderDocument String?   @map("holder_document")
   issuer         String?   @db.VarChar(100)
   isDefault      Boolean   @default(false) @map("is_default")
@@ -245,15 +337,16 @@ model SavedCard {
 }
 
 model Review {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  productId String   @map("product_id")
-  userName  String   @map("user_name")
-  rating    Int      @db.SmallInt
-  comment   String
-  photos    String[]
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id                  String   @id @default(uuid())
+  userId              String   @map("user_id")
+  productId           String   @map("product_id")
+  userName            String   @map("user_name")
+  rating              Int      @db.SmallInt
+  comment             String
+  photos              String[]
+  isVerifiedPurchase  Boolean  @default(false) @map("is_verified_purchase")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -262,4 +355,19 @@ model Review {
   @@index([productId])
   @@index([userId])
   @@map("reviews")
+}
+
+model WishlistItem {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  productId String   @map("product_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
+  @@map("wishlist_items")
 }

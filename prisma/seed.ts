@@ -71,7 +71,7 @@ const PRODUCTS = [
     installmentPrice: 29.97,
   },
   {
-    id: 'c3d4e5f6-a7b8-9012-cdef-123456789012',
+    id: 'c3d4e5f6-a7b8-4012-8def-123456789012',
     name: 'Cortina de Franja Metalizada Rosa Gold',
     slug: 'cortina-franja-metalizada-rosa-gold',
     description:
@@ -104,7 +104,7 @@ const PRODUCTS = [
     installmentPrice: null,
   },
   {
-    id: 'd4e5f6a7-b8c9-0123-def0-234567890123',
+    id: 'd4e5f6a7-b8c9-4123-9ef0-234567890123',
     name: 'Kit Festa Completo Tema Unicórnio - 16 Convidados',
     slug: 'kit-festa-completo-unicornio-16-convidados',
     description:
@@ -137,7 +137,7 @@ const PRODUCTS = [
     installmentPrice: 21.65,
   },
   {
-    id: 'e5f6a7b8-c9d0-1234-ef01-345678901234',
+    id: 'e5f6a7b8-c9d0-1234-af01-345678901234',
     name: 'Forminha para Doces Luxo Dourada - 100 unidades',
     slug: 'forminha-doces-luxo-dourada-100un',
     description:
@@ -170,7 +170,7 @@ const PRODUCTS = [
     installmentPrice: null,
   },
   {
-    id: 'f6a7b8c9-d0e1-2345-f012-456789012345',
+    id: 'f6a7b8c9-d0e1-2345-b012-456789012345',
     name: 'Vela Número Gigante Glitter - Todas as Idades',
     slug: 'vela-numero-gigante-glitter',
     description:
@@ -203,7 +203,7 @@ const PRODUCTS = [
     installmentPrice: null,
   },
   {
-    id: 'a7b8c9d0-e1f2-3456-0123-567890123456',
+    id: 'a7b8c9d0-e1f2-3456-8123-567890123456',
     name: 'Convites Personalizados Festa Tropical - 20 unidades',
     slug: 'convites-personalizados-festa-tropical-20un',
     description:
@@ -236,7 +236,7 @@ const PRODUCTS = [
     installmentPrice: 21.0,
   },
   {
-    id: 'b8c9d0e1-f2a3-4567-1234-678901234567',
+    id: 'b8c9d0e1-f2a3-4567-9234-678901234567',
     name: 'Fantasia Infantil Princesa com Tiara e Varinha',
     slug: 'fantasia-infantil-princesa-tiara-varinha',
     description:
@@ -269,7 +269,7 @@ const PRODUCTS = [
     installmentPrice: 26.63,
   },
   {
-    id: 'c9d0e1f2-a3b4-5678-2345-789012345678',
+    id: 'c9d0e1f2-a3b4-5678-a345-789012345678',
     name: 'Óculos Festa Neon LED - Kit 10 Unidades Cores Sortidas',
     slug: 'oculos-festa-neon-led-kit-10un',
     description:
@@ -302,7 +302,7 @@ const PRODUCTS = [
     installmentPrice: 19.97,
   },
   {
-    id: 'd0e1f2a3-b4c5-6789-3456-890123456789',
+    id: 'd0e1f2a3-b4c5-6789-b456-890123456789',
     name: 'Faixa de Aniversário Personalizada com Nome - Banner TNT',
     slug: 'faixa-aniversario-personalizada-banner-tnt',
     description:
@@ -1946,7 +1946,6 @@ async function main() {
           expiryMonth: 12,
           expiryYear: 2027,
           cardType: 'CREDIT',
-          cardNumber: '4111111111111234',
           holderDocument: '12345678901',
           issuer: 'Nubank',
           isDefault: true,
@@ -1959,7 +1958,6 @@ async function main() {
           expiryMonth: 6,
           expiryYear: 2026,
           cardType: 'DEBIT',
-          cardNumber: '5500000000005678',
           holderDocument: '12345678901',
           issuer: 'Itaú Unibanco',
           isDefault: false,
@@ -2004,7 +2002,7 @@ async function main() {
               total: 49.9,
             },
             {
-              productId: 'd4e5f6a7-b8c9-0123-def0-234567890123', // Kit Unicornio
+              productId: 'd4e5f6a7-b8c9-4123-9ef0-234567890123', // Kit Unicornio
               quantity: 1,
               unitPrice: 129.9,
               total: 129.9,
@@ -2068,19 +2066,19 @@ async function main() {
         items: {
           create: [
             {
-              productId: 'c3d4e5f6-a7b8-9012-cdef-123456789012', // Cortina Metalizada
+              productId: 'c3d4e5f6-a7b8-4012-8def-123456789012', // Cortina Metalizada
               quantity: 2,
               unitPrice: 24.9,
               total: 49.8,
             },
             {
-              productId: 'f6a7b8c9-d0e1-2345-f012-456789012345', // Vela Glitter
+              productId: 'f6a7b8c9-d0e1-2345-b012-456789012345', // Vela Glitter
               quantity: 1,
               unitPrice: 18.9,
               total: 18.9,
             },
             {
-              productId: 'c9d0e1f2-a3b4-5678-2345-789012345678', // Oculos Neon
+              productId: 'c9d0e1f2-a3b4-5678-a345-789012345678', // Oculos Neon
               quantity: 1,
               unitPrice: 59.9,
               total: 59.9,
@@ -2107,13 +2105,13 @@ async function main() {
         items: {
           create: [
             {
-              productId: 'e5f6a7b8-c9d0-1234-ef01-345678901234', // Forminhas Douradas
+              productId: 'e5f6a7b8-c9d0-1234-af01-345678901234', // Forminhas Douradas
               quantity: 1,
               unitPrice: 34.9,
               total: 34.9,
             },
             {
-              productId: 'a7b8c9d0-e1f2-3456-0123-567890123456', // Convites Tropical
+              productId: 'a7b8c9d0-e1f2-3456-8123-567890123456', // Convites Tropical
               quantity: 1,
               unitPrice: 42.0,
               total: 42.0,
@@ -2149,7 +2147,7 @@ async function main() {
         },
         {
           userId: admin.id,
-          productId: 'd4e5f6a7-b8c9-0123-def0-234567890123',
+          productId: 'd4e5f6a7-b8c9-4123-9ef0-234567890123',
           userName: 'Admin',
           rating: 4,
           comment: 'Kit muito completo e bonito. Minha filha amou o tema unicornio. Unica ressalva e que os copos sao um pouco finos.',
@@ -2157,7 +2155,7 @@ async function main() {
         },
         {
           userId: admin.id,
-          productId: 'c3d4e5f6-a7b8-9012-cdef-123456789012',
+          productId: 'c3d4e5f6-a7b8-4012-8def-123456789012',
           userName: 'Admin',
           rating: 5,
           comment: 'Cortina linda! A cor rosa gold e exatamente como nas fotos. Fita adesiva inclusa facilita muito a montagem.',
@@ -2168,7 +2166,7 @@ async function main() {
         },
         {
           userId: admin.id,
-          productId: 'e5f6a7b8-c9d0-1234-ef01-345678901234',
+          productId: 'e5f6a7b8-c9d0-1234-af01-345678901234',
           userName: 'Admin',
           rating: 5,
           comment: 'Forminhas perfeitas para brigadeiro gourmet. Acabamento impecavel, papel resistente. Recomendo!',
