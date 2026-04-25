@@ -2,7 +2,7 @@ import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
 import { AppError } from '../../domain/errors/app-error.js';
 import { errorResponse } from '../utils/response.js';
-import { env } from '../../infra/config/env.js';
+import { logger } from '../utils/logger.js';
 
 export function globalErrorHandler(
   error: FastifyError,
@@ -31,11 +31,7 @@ export function globalErrorHandler(
     return;
   }
 
-  console.error('[UNHANDLED ERROR]', {
-    message: error.message,
-    stack: env.NODE_ENV === 'development' ? error.stack : undefined,
-    code: error.code,
-  });
+  logger.error({ err: error, code: error.code }, 'Unhandled error');
 
   void reply.status(500).send(
     errorResponse('Internal server error', 'INTERNAL_ERROR'),
