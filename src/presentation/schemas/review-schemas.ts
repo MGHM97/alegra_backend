@@ -8,3 +8,14 @@ export const createReviewSchema = z.object({
 });
 
 export type CreateReviewInput = z.infer<typeof createReviewSchema>;
+
+export const adminListReviewsQuerySchema = z.object({
+  cursor: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  productId: z.string().uuid().optional(),
+  userId: z.string().uuid().optional(),
+  rating: z.coerce.number().int().min(1).max(5).optional(),
+  search: z.string().trim().min(1).max(120).optional(),
+});
+
+export type AdminListReviewsQuery = z.infer<typeof adminListReviewsQuerySchema>;
