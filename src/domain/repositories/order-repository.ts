@@ -1,4 +1,9 @@
-import type { OrderEntity, OrderWithProductsEntity } from '../entities/order.js';
+import type {
+  OrderEntity,
+  OrderWithProductsEntity,
+  PaymentMethod,
+  PaymentStatus,
+} from '../entities/order.js';
 
 export interface CreateOrderItemInput {
   productId: string;
@@ -6,11 +11,37 @@ export interface CreateOrderItemInput {
   unitPrice: number;
 }
 
+export interface CreateOrderShippingAddress {
+  recipientName: string | null;
+  street: string;
+  number: string;
+  complement: string | null;
+  neighborhood: string;
+  city: string;
+  state: string;
+  zipCode: string;
+}
+
 export interface CreateOrderInput {
   userId: string;
   items: CreateOrderItemInput[];
   idempotencyKey?: string;
   notes?: string;
+  couponCode?: string;
+  shippingCost?: number;
+  shippingMethodName?: string;
+  shippingCarrier?: string;
+  shippingAddress?: CreateOrderShippingAddress;
+  paymentIntentId?: string;
+  paymentMethod?: PaymentMethod;
+  paymentStatus?: PaymentStatus;
+  savedCardId?: string;
+  pixQrCode?: string;
+  pixQrCodeText?: string;
+  pixExpiresAt?: Date;
+  boletoUrl?: string;
+  boletoBarcode?: string;
+  boletoExpiresAt?: Date;
 }
 
 export interface OrderListFilters {

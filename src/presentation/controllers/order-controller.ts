@@ -2,9 +2,33 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { PrismaOrderRepository } from '../../infra/database/prisma-order-repository.js';
 import type { CreateOrderInput } from '../schemas/order-schemas.js';
 import { successResponse } from '../../shared/utils/response.js';
-import { UnauthorizedError, NotFoundError } from '../../domain/errors/app-error.js';
+import {
+  ForbiddenError,
+  NotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from '../../domain/errors/app-error.js';
+import { prisma } from '../../infra/database/prisma-client.js';
+import { releaseCouponUsage } from '../../application/services/coupon-service.js';
+import type { PaymentMethod, PaymentStatus } from '../../domain/entities/order.js';
 
 const orderRepository = new PrismaOrderRepository();
+
+/**
+ * Maps the lowercase payment-method key used on the wire to the uppercase
+ * Prisma enum value. Defensive: callers can pass either form, we normalize.
+ */
+function normalizePaymentMethod(
+  value: CreateOrderInput['paymentMethod'],
+): PaymentMethod | undefined {
+  if (!value) return undefined;
+  const upper = value.toUpperCase();
+  if (upper === 'PIX') return 'PIX';
+  if (upper === 'CARD') return 'CARD';
+  if (upper === 'SAVED_CARD') return 'SAVED_CARD';
+  if (upper === 'BOLETO') return 'BOLETO';
+  return undefined;
+}
 
 export async function createOrderHandler(
   request: FastifyRequest<{ Body: CreateOrderInput }>,
@@ -23,11 +47,101 @@ export async function createOrderHandler(
     }
   }
 
+  // Resolve shipping address by id (Zero-Trust: must belong to the user).
+  let shippingAddress: {
+    recipientName: string | null;
+    street: string;
+    number: string;
+    complement: string | null;
+    neighborhood: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  } | undefined;
+
+  if (request.body.shippingAddressId) {
+    const addr = await prisma.address.findUnique({
+      where: { id: request.body.shippingAddressId },
+      select: {
+        userId: true,
+        recipientName: true,
+        label: true,
+        street: true,
+        number: true,
+        complement: true,
+        neighborhood: true,
+        city: true,
+        state: true,
+        zipCode: true,
+      },
+    });
+    if (!addr) {
+      throw new NotFoundError('Endereço não encontrado.');
+    }
+    if (addr.userId !== currentUser.sub) {
+      throw new ForbiddenError('Endereço não pertence a este usuário.');
+    }
+    shippingAddress = {
+      recipientName: addr.recipientName ?? addr.label,
+      street: addr.street,
+      number: addr.number,
+      complement: addr.complement,
+      neighborhood: addr.neighborhood,
+      city: addr.city,
+      state: addr.state,
+      zipCode: addr.zipCode,
+    };
+  }
+
+  const paymentMethod = normalizePaymentMethod(request.body.paymentMethod);
+
+  // For non-card flows, the payment status is meaningful at creation time:
+  // PIX/Boleto are awaiting customer action, saved_card may have already
+  // succeeded (off_session confirm). The frontend reports status; the webhook
+  // is authoritative for transitions and overrides if necessary.
+  const paymentStatus: PaymentStatus | undefined = request.body.paymentStatus
+    ? (request.body.paymentStatus as PaymentStatus)
+    : paymentMethod === 'PIX' || paymentMethod === 'BOLETO'
+      ? 'REQUIRES_ACTION'
+      : 'PROCESSING';
+
+  // Validate savedCard ownership when reusing one — defensive duplicate of
+  // the check in the payment controller, since the order can in theory be
+  // created with a paymentIntent that was generated earlier.
+  if (paymentMethod === 'SAVED_CARD' && request.body.savedCardId) {
+    const card = await prisma.savedCard.findFirst({
+      where: { id: request.body.savedCardId },
+      select: { id: true, userId: true },
+    });
+    if (!card || card.userId !== currentUser.sub) {
+      throw new ForbiddenError('Cartão não pertence a este usuário.');
+    }
+  }
+
   const order = await orderRepository.create({
     userId: currentUser.sub,
     items: request.body.items,
     idempotencyKey: request.body.idempotencyKey,
     notes: request.body.notes,
+    couponCode: request.body.couponCode,
+    shippingCost: request.body.shippingCost,
+    shippingMethodName: request.body.shippingMethodName,
+    shippingCarrier: request.body.shippingCarrier,
+    shippingAddress,
+    paymentIntentId: request.body.paymentIntentId,
+    paymentMethod,
+    paymentStatus,
+    savedCardId: request.body.savedCardId,
+    pixQrCode: request.body.pixQrCode,
+    pixQrCodeText: request.body.pixQrCodeText,
+    pixExpiresAt: request.body.pixExpiresAt
+      ? new Date(request.body.pixExpiresAt)
+      : undefined,
+    boletoUrl: request.body.boletoUrl,
+    boletoBarcode: request.body.boletoBarcode,
+    boletoExpiresAt: request.body.boletoExpiresAt
+      ? new Date(request.body.boletoExpiresAt)
+      : undefined,
   });
 
   void reply.status(201).send(successResponse(serializeOrder(order)));
@@ -80,7 +194,7 @@ function toNumber(value: { toNumber?: () => number } | number): number {
   return Number(value);
 }
 
-function serializeOrder(order: {
+interface SerializableOrderBase {
   id: string;
   userId: string;
   status: string;
@@ -88,8 +202,24 @@ function serializeOrder(order: {
   idempotencyKey: string | null;
   reservedUntil: Date | null;
   notes: string | null;
+  couponId?: string | null;
+  couponCode?: string | null;
+  discountAmount?: { toNumber?: () => number } | number | null;
+  paymentMethod?: string | null;
+  paymentStatus?: string | null;
+  pixQrCode?: string | null;
+  pixQrCodeText?: string | null;
+  pixExpiresAt?: Date | null;
+  boletoUrl?: string | null;
+  boletoBarcode?: string | null;
+  boletoExpiresAt?: Date | null;
+  shippingCost?: { toNumber?: () => number } | number | null;
+  shippingMethodName?: string | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+function serializeOrder(order: SerializableOrderBase & {
   items: Array<{
     id: string;
     productId: string;
@@ -101,6 +231,31 @@ function serializeOrder(order: {
   return {
     ...order,
     totalAmount: toNumber(order.totalAmount),
+    discountAmount:
+      order.discountAmount === null || order.discountAmount === undefined
+        ? null
+        : toNumber(order.discountAmount),
+    couponId: order.couponId ?? null,
+    couponCode: order.couponCode ?? null,
+    paymentMethod: order.paymentMethod
+      ? order.paymentMethod.toLowerCase()
+      : null,
+    paymentStatus: order.paymentStatus
+      ? order.paymentStatus.toLowerCase()
+      : null,
+    pixQrCode: order.pixQrCode ?? null,
+    pixQrCodeText: order.pixQrCodeText ?? null,
+    pixExpiresAt: order.pixExpiresAt ? order.pixExpiresAt.toISOString() : null,
+    boletoUrl: order.boletoUrl ?? null,
+    boletoBarcode: order.boletoBarcode ?? null,
+    boletoExpiresAt: order.boletoExpiresAt
+      ? order.boletoExpiresAt.toISOString()
+      : null,
+    shippingCost:
+      order.shippingCost === null || order.shippingCost === undefined
+        ? null
+        : toNumber(order.shippingCost),
+    shippingMethodName: order.shippingMethodName ?? null,
     items: order.items.map((item) => ({
       ...item,
       unitPrice: toNumber(item.unitPrice),
@@ -125,14 +280,7 @@ function computeCanRequestHelp(status: string, deliveredAt: Date | null): boolea
   return true;
 }
 
-function serializeOrderWithProducts(order: {
-  id: string;
-  userId: string;
-  status: string;
-  totalAmount: { toNumber?: () => number } | number;
-  idempotencyKey: string | null;
-  reservedUntil: Date | null;
-  notes: string | null;
+function serializeOrderWithProducts(order: SerializableOrderBase & {
   shippingName: string | null;
   shippingStreet: string | null;
   shippingNumber: string | null;
@@ -144,8 +292,6 @@ function serializeOrderWithProducts(order: {
   trackingCode: string | null;
   shippingCarrier: string | null;
   deliveredAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
   items: Array<{
     id: string;
     productId: string;
@@ -166,6 +312,31 @@ function serializeOrderWithProducts(order: {
     status: order.status,
     totalAmount: toNumber(order.totalAmount),
     notes: order.notes,
+    couponId: order.couponId ?? null,
+    couponCode: order.couponCode ?? null,
+    discountAmount:
+      order.discountAmount === null || order.discountAmount === undefined
+        ? null
+        : toNumber(order.discountAmount),
+    paymentMethod: order.paymentMethod
+      ? order.paymentMethod.toLowerCase()
+      : null,
+    paymentStatus: order.paymentStatus
+      ? order.paymentStatus.toLowerCase()
+      : null,
+    pixQrCode: order.pixQrCode ?? null,
+    pixQrCodeText: order.pixQrCodeText ?? null,
+    pixExpiresAt: order.pixExpiresAt ? order.pixExpiresAt.toISOString() : null,
+    boletoUrl: order.boletoUrl ?? null,
+    boletoBarcode: order.boletoBarcode ?? null,
+    boletoExpiresAt: order.boletoExpiresAt
+      ? order.boletoExpiresAt.toISOString()
+      : null,
+    shippingCost:
+      order.shippingCost === null || order.shippingCost === undefined
+        ? null
+        : toNumber(order.shippingCost),
+    shippingMethodName: order.shippingMethodName ?? null,
     shippingAddress: order.shippingStreet
       ? {
           name: order.shippingName,
@@ -198,4 +369,60 @@ function serializeOrderWithProducts(order: {
       },
     })),
   };
+}
+
+const CANCELLABLE_STATUSES = new Set(['PENDING', 'RESERVED']);
+
+export async function cancelOrderHandler(
+  request: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply,
+): Promise<void> {
+  const currentUser = request.currentUser;
+  if (!currentUser) {
+    throw new UnauthorizedError();
+  }
+
+  const order = await orderRepository.findById(request.params.id);
+  if (!order) {
+    throw new NotFoundError('Order');
+  }
+  if (order.userId !== currentUser.sub) {
+    throw new NotFoundError('Order');
+  }
+
+  if (!CANCELLABLE_STATUSES.has(order.status)) {
+    throw new ValidationError(
+      `Pedido não pode ser cancelado no status atual (${order.status}). Apenas pedidos pendentes ou reservados podem ser cancelados.`,
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const item of order.items) {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { reservedStock: { decrement: item.quantity } },
+      });
+
+      await tx.inventoryLog.create({
+        data: {
+          productId: item.productId,
+          action: 'RESERVATION_RELEASE',
+          quantity: item.quantity,
+          reason: `Customer cancelled order ${order.id}`,
+        },
+      });
+    }
+
+    // If the order used a coupon, release the reserved usage slot.
+    if (order.couponId) {
+      await releaseCouponUsage(tx, order.couponId);
+    }
+
+    await tx.order.update({
+      where: { id: order.id },
+      data: { status: 'CANCELLED' },
+    });
+  });
+
+  void reply.status(200).send(successResponse({ message: 'Pedido cancelado com sucesso.' }));
 }

@@ -3,6 +3,7 @@ import {
   createOrderHandler,
   listUserOrdersHandler,
   getOrderDetailHandler,
+  cancelOrderHandler,
 } from '../controllers/order-controller.js';
 import { createOrderSchema } from '../schemas/order-schemas.js';
 import { validateBody } from '../../shared/middlewares/validate.js';
@@ -22,5 +23,9 @@ export async function orderRoutes(fastify: FastifyInstance): Promise<void> {
 
   fastify.get('/:id', {
     handler: getOrderDetailHandler,
+  });
+
+  fastify.patch('/:id/cancel', {
+    handler: cancelOrderHandler,
   });
 }

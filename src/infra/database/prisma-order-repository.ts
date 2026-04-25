@@ -7,6 +7,13 @@ import type {
   OrderRepository,
 } from '../../domain/repositories/order-repository.js';
 import { InsufficientStockError } from '../../domain/errors/app-error.js';
+import {
+  assertCouponUsable,
+  computeDiscount,
+  normalizeCouponCode,
+  reserveCouponUsage,
+} from '../../application/services/coupon-service.js';
+import type { Coupon } from '../../domain/entities/coupon.js';
 
 const STOCK_RESERVATION_MINUTES = 15;
 
@@ -94,6 +101,32 @@ export class PrismaOrderRepository implements OrderRepository {
   async create(data: CreateOrderInput): Promise<OrderEntity> {
     const reservedUntil = new Date(Date.now() + STOCK_RESERVATION_MINUTES * 60 * 1000);
 
+    // Pre-fetch the coupon outside the transaction for early validation.
+    // The atomic reservation (reserveCouponUsage) still happens inside
+    // the transaction below to guarantee consistency under concurrency.
+    let preCoupon: Coupon | null = null;
+    if (data.couponCode) {
+      const normalized = normalizeCouponCode(data.couponCode);
+      const record = await prisma.coupon.findUnique({ where: { code: normalized } });
+      if (record) {
+        preCoupon = {
+          id: record.id,
+          code: record.code,
+          discountType: record.discountType as Coupon['discountType'],
+          discountValue: record.discountValue.toNumber(),
+          maxUses: record.maxUses,
+          usedCount: record.usedCount,
+          validFrom: record.validFrom,
+          validUntil: record.validUntil,
+          minOrderAmount: record.minOrderAmount ? record.minOrderAmount.toNumber() : null,
+          description: record.description,
+          isActive: record.isActive,
+          createdAt: record.createdAt,
+          updatedAt: record.updatedAt,
+        };
+      }
+    }
+
     const order = await prisma.$transaction(async (tx) => {
       for (const item of data.items) {
         const product = await tx.product.findUnique({
@@ -131,10 +164,30 @@ export class PrismaOrderRepository implements OrderRepository {
         });
       }
 
-      const totalAmount = data.items.reduce(
+      const subtotal = data.items.reduce(
         (sum, item) => sum + item.unitPrice * item.quantity,
         0,
       );
+
+      // Apply coupon — revalidates server-side and reserves the usage slot
+      // inside the same transaction. If the coupon hits maxUses concurrently,
+      // reserveCouponUsage throws CouponError('COUPON_MAX_USES') and rolls
+      // back the entire order (including stock reservations).
+      let discountAmount = 0;
+      let couponId: string | null = null;
+      let couponCode: string | null = null;
+
+      if (data.couponCode) {
+        assertCouponUsable(preCoupon, subtotal);
+        discountAmount = computeDiscount(subtotal, preCoupon);
+        await reserveCouponUsage(tx, preCoupon.id);
+        couponId = preCoupon.id;
+        couponCode = preCoupon.code;
+      }
+
+      const shippingCost = data.shippingCost ?? 0;
+      const totalAmount =
+        Math.round((subtotal - discountAmount + shippingCost) * 100) / 100;
 
       const newOrder = await tx.order.create({
         data: {
@@ -142,8 +195,34 @@ export class PrismaOrderRepository implements OrderRepository {
           status: 'RESERVED',
           totalAmount: new Prisma.Decimal(totalAmount),
           idempotencyKey: data.idempotencyKey,
+          paymentIntentId: data.paymentIntentId,
           reservedUntil,
           notes: data.notes,
+          couponId,
+          couponCode,
+          discountAmount: discountAmount > 0 ? new Prisma.Decimal(discountAmount) : null,
+          paymentMethod: data.paymentMethod,
+          paymentStatus: data.paymentStatus,
+          savedCardId: data.savedCardId,
+          shippingMethodName: data.shippingMethodName,
+          shippingCarrier: data.shippingCarrier,
+          shippingCost: shippingCost > 0 ? new Prisma.Decimal(shippingCost) : null,
+          ...(data.shippingAddress && {
+            shippingName: data.shippingAddress.recipientName,
+            shippingStreet: data.shippingAddress.street,
+            shippingNumber: data.shippingAddress.number,
+            shippingComplement: data.shippingAddress.complement,
+            shippingNeighborhood: data.shippingAddress.neighborhood,
+            shippingCity: data.shippingAddress.city,
+            shippingState: data.shippingAddress.state,
+            shippingZipCode: data.shippingAddress.zipCode,
+          }),
+          pixQrCode: data.pixQrCode,
+          pixQrCodeText: data.pixQrCodeText,
+          pixExpiresAt: data.pixExpiresAt,
+          boletoUrl: data.boletoUrl,
+          boletoBarcode: data.boletoBarcode,
+          boletoExpiresAt: data.boletoExpiresAt,
           items: {
             create: data.items.map((item) => ({
               productId: item.productId,

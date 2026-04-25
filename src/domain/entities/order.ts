@@ -10,6 +10,17 @@ export type OrderStatus =
   | 'CANCELLED'
   | 'REFUNDED';
 
+export type PaymentMethod = 'PIX' | 'CARD' | 'SAVED_CARD' | 'BOLETO';
+
+export type PaymentStatus =
+  | 'PENDING'
+  | 'REQUIRES_ACTION'
+  | 'REQUIRES_CONFIRMATION'
+  | 'PROCESSING'
+  | 'SUCCEEDED'
+  | 'FAILED'
+  | 'CANCELED';
+
 export interface OrderItemEntity {
   id: string;
   orderId: string;
@@ -37,7 +48,21 @@ export interface OrderEntity {
   shippingZipCode: string | null;
   trackingCode: string | null;
   shippingCarrier: string | null;
+  shippingMethodName: string | null;
+  shippingCost: Decimal | null;
   deliveredAt: Date | null;
+  couponId: string | null;
+  couponCode: string | null;
+  discountAmount: Decimal | null;
+  paymentMethod: PaymentMethod | null;
+  paymentStatus: PaymentStatus | null;
+  pixQrCode: string | null;
+  pixQrCodeText: string | null;
+  pixExpiresAt: Date | null;
+  boletoUrl: string | null;
+  boletoBarcode: string | null;
+  boletoExpiresAt: Date | null;
+  savedCardId: string | null;
   createdAt: Date;
   updatedAt: Date;
   items: OrderItemEntity[];
