@@ -44,6 +44,7 @@ export const createOrderSchema = z.object({
     ])
     .optional(),
   savedCardId: z.string().min(1).max(64).optional(),
+  installments: z.number().int().min(1).max(12).optional().default(1),
   pixQrCode: z.string().max(200000).optional(),
   pixQrCodeText: z.string().max(2000).optional(),
   pixExpiresAt: z.string().datetime().optional(),

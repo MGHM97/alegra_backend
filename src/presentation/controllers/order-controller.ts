@@ -131,6 +131,7 @@ export async function createOrderHandler(
     paymentIntentId: request.body.paymentIntentId,
     paymentMethod,
     paymentStatus,
+    installments: request.body.installments,
     savedCardId: request.body.savedCardId,
     pixQrCode: request.body.pixQrCode,
     pixQrCodeText: request.body.pixQrCodeText,
@@ -194,6 +195,25 @@ function toNumber(value: { toNumber?: () => number } | number): number {
   return Number(value);
 }
 
+/**
+ * Normaliza os dados de parcelamento para a resposta. `amountCharged` é o
+ * valor REAL cobrado (mercadorias + frete + juros), garantindo que o pedido
+ * exibido bata com a cobrança da Stripe.
+ */
+function serializeInstallmentInfo(order: SerializableOrderBase) {
+  const installments = order.installments ?? 1;
+  const installmentFee =
+    order.installmentFee === null || order.installmentFee === undefined
+      ? 0
+      : toNumber(order.installmentFee);
+  const total = toNumber(order.totalAmount);
+  return {
+    installments,
+    installmentFee,
+    amountCharged: Math.round((total + installmentFee) * 100) / 100,
+  };
+}
+
 interface SerializableOrderBase {
   id: string;
   userId: string;
@@ -207,6 +227,8 @@ interface SerializableOrderBase {
   discountAmount?: { toNumber?: () => number } | number | null;
   paymentMethod?: string | null;
   paymentStatus?: string | null;
+  installments?: number | null;
+  installmentFee?: { toNumber?: () => number } | number | null;
   pixQrCode?: string | null;
   pixQrCodeText?: string | null;
   pixExpiresAt?: Date | null;
@@ -243,6 +265,7 @@ function serializeOrder(order: SerializableOrderBase & {
     paymentStatus: order.paymentStatus
       ? order.paymentStatus.toLowerCase()
       : null,
+    ...serializeInstallmentInfo(order),
     pixQrCode: order.pixQrCode ?? null,
     pixQrCodeText: order.pixQrCodeText ?? null,
     pixExpiresAt: order.pixExpiresAt ? order.pixExpiresAt.toISOString() : null,
@@ -324,6 +347,7 @@ function serializeOrderWithProducts(order: SerializableOrderBase & {
     paymentStatus: order.paymentStatus
       ? order.paymentStatus.toLowerCase()
       : null,
+    ...serializeInstallmentInfo(order),
     pixQrCode: order.pixQrCode ?? null,
     pixQrCodeText: order.pixQrCodeText ?? null,
     pixExpiresAt: order.pixExpiresAt ? order.pixExpiresAt.toISOString() : null,

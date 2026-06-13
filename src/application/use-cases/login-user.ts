@@ -3,6 +3,7 @@ import type { UserRepository } from '../../domain/repositories/user-repository.j
 import { UnauthorizedError } from '../../domain/errors/app-error.js';
 import { verifyPassword } from '../../shared/utils/password.js';
 import { signAccessToken, signRefreshToken } from '../../shared/utils/jwt.js';
+import { hashToken } from '../../shared/utils/token-hash.js';
 import { prisma } from '../../infra/database/prisma-client.js';
 import type { LoginInput } from '../../presentation/schemas/auth-schemas.js';
 
@@ -53,7 +54,7 @@ export class LoginUserUseCase {
     await prisma.refreshToken.create({
       data: {
         id: tokenId,
-        token: refreshTokenStr,
+        tokenHash: hashToken(refreshTokenStr),
         userId: user.id,
         expiresAt,
       },

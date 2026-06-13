@@ -1,7 +1,9 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../infra/database/prisma-client.js';
 import { PaymentService } from '../../application/services/payment-service.js';
 import { successResponse } from '../../shared/utils/response.js';
+import { logger } from '../../shared/utils/logger.js';
 import {
   ForbiddenError,
   NotFoundError,
@@ -15,6 +17,7 @@ import {
   assertCouponUsable,
 } from '../../application/services/coupon-service.js';
 import type { CreatePaymentIntentInput } from '../schemas/payment-schemas.js';
+import { computeChargeableTotal } from '../../shared/utils/installments.js';
 
 const paymentService = new PaymentService();
 const emailService = new EmailService();
@@ -82,7 +85,14 @@ export async function createPaymentIntentHandler(
 
   const totalAmount =
     Math.round((subtotal - discountAmount + shippingCost) * 100) / 100;
-  const amountInCents = Math.round(totalAmount * 100);
+  // Valor efetivamente cobrado: inclui juros de parcelamento acima de 3x.
+  const chargeableAmount = computeChargeableTotal(
+    totalAmount,
+    paymentMethod,
+    installments ?? 1,
+  );
+  const installmentFee = Math.round((chargeableAmount - totalAmount) * 100) / 100;
+  const amountInCents = Math.round(chargeableAmount * 100);
 
   if (amountInCents < 50) {
     throw new ValidationError('O valor mínimo do pedido é R$ 0,50');
@@ -92,6 +102,7 @@ export async function createPaymentIntentHandler(
   // the SavedCard.id; we resolve it against the authenticated userId before
   // passing the Stripe payment_method id to the PaymentService.
   let stripePaymentMethodId: string | undefined;
+  let stripeCustomerId: string | undefined;
   if (paymentMethod === 'saved_card') {
     if (!savedCardId) {
       throw new ValidationError(
@@ -100,7 +111,12 @@ export async function createPaymentIntentHandler(
     }
     const card = await prisma.savedCard.findFirst({
       where: { id: savedCardId },
-      select: { id: true, userId: true },
+      select: {
+        id: true,
+        userId: true,
+        stripePaymentMethodId: true,
+        stripeCustomerId: true,
+      },
     });
     if (!card) {
       throw new NotFoundError('Cartão não encontrado.');
@@ -108,13 +124,20 @@ export async function createPaymentIntentHandler(
     if (card.userId !== currentUser.sub) {
       throw new ForbiddenError('Cartão não pertence a este usuário.');
     }
-    // Note: in a production setup the SavedCard would also store the Stripe
-    // `payment_method` id (pm_xxx) created at tokenization time. The current
-    // schema does not yet — so we treat the card.id as a stable token and
-    // delegate the actual Stripe lookup to the future tokenization flow.
-    // For now, the PaymentService uses card.id as the Stripe pm id; this is
-    // explicitly documented and will be wired to a real tokenization step.
-    stripePaymentMethodId = card.id;
+    // Cobrança off-session exige o payment_method id real da Stripe (pm_...),
+    // gravado na tokenização (SetupIntent). Se ausente, NÃO enviamos um id
+    // interno como se fosse da Stripe (causaria erro genérico/cobrança
+    // indevida) — bloqueamos com mensagem clara e direcionamos o cliente a
+    // pagar com um novo cartão.
+    if (!card.stripePaymentMethodId) {
+      throw new ValidationError(
+        'Este cartão salvo ainda não está habilitado para cobrança. Pague com um novo cartão para concluir.',
+      );
+    }
+    stripePaymentMethodId = card.stripePaymentMethodId;
+    if (card.stripeCustomerId) {
+      stripeCustomerId = card.stripeCustomerId;
+    }
   }
 
   const metadata: Record<string, string> = {
@@ -145,6 +168,7 @@ export async function createPaymentIntentHandler(
     metadata,
     paymentMethod,
     ...(stripePaymentMethodId ? { stripePaymentMethodId } : {}),
+    ...(stripeCustomerId ? { stripeCustomerId } : {}),
     ...(installments ? { installments } : {}),
   });
 
@@ -159,11 +183,13 @@ export async function createPaymentIntentHandler(
       discountAmount,
       shippingCost,
       installments: installments ?? 1,
+      // Valor REAL cobrado (mercadorias + frete + juros de parcelamento).
+      amountCharged: chargeableAmount,
+      installmentFee,
       coupon: appliedCouponId
         ? { id: appliedCouponId, code: appliedCouponCode }
         : null,
       pixData: result.pixData,
-      boletoData: result.boletoData,
     }),
   );
 }
@@ -192,48 +218,103 @@ export async function webhookHandler(
     throw new ValidationError('Invalid webhook signature');
   }
 
-  if (event.type === 'payment_intent.succeeded') {
-    const paymentIntent = event.data.object;
-    const paymentIntentId = paymentIntent.id;
-
-    const order = await prisma.order.findUnique({
-      where: { paymentIntentId },
-      include: {
-        user: { select: { email: true, name: true } },
-        items: true,
+  // Idempotência: o Stripe pode reentregar o mesmo evento (retries, replays).
+  // Reivindicamos o event.id de forma atômica reusando IdempotencyRecord. Se já
+  // existe (P2002), é entrega duplicada → respondemos 200 sem reprocessar
+  // (evita confirmar pedido / enviar e-mail duas vezes). O job de limpeza já
+  // purga IdempotencyRecord expirados.
+  const claimKey = `webhook:${event.id}`;
+  try {
+    await prisma.idempotencyRecord.create({
+      data: {
+        key: claimKey,
+        response: { received: true } as Prisma.InputJsonValue,
+        status: 200,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       },
     });
-
-    if (order && order.status === 'RESERVED') {
-      await prisma.order.update({
-        where: { id: order.id },
-        data: { status: 'CONFIRMED', paymentStatus: 'SUCCEEDED' },
-      });
-
-      try {
-        await emailService.sendOrderConfirmed(
-          order.user.email,
-          order.user.name,
-          order.id,
-          order.totalAmount.toNumber(),
-          order.items.length,
-        );
-      } catch {
-        // Email failure should not break webhook response
-      }
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      void reply.status(200).send({ received: true, duplicate: true });
+      return;
     }
+    throw err;
   }
 
-  if (event.type === 'payment_intent.payment_failed') {
-    const paymentIntent = event.data.object;
-    await prisma.order
-      .updateMany({
+  try {
+    if (event.type === 'payment_intent.succeeded') {
+      const paymentIntent = event.data.object;
+      const paymentIntentId = paymentIntent.id;
+
+      const order = await prisma.order.findUnique({
+        where: { paymentIntentId },
+        include: {
+          user: { select: { email: true, name: true } },
+          items: true,
+        },
+      });
+
+      if (!order) {
+        // PaymentIntent pago sem pedido correspondente (cliente abandonou após
+        // pagar, ou webhook chegou antes da criação do pedido). Não dá para
+        // reconstruir o pedido aqui (sem itens/endereço), então registramos
+        // para conciliação manual em vez de engolir silenciosamente.
+        logger.warn(
+          { paymentIntentId, eventId: event.id },
+          'Webhook payment_intent.succeeded sem pedido correspondente (órfão)',
+        );
+      } else if (order.status === 'RESERVED') {
+        await prisma.order.update({
+          where: { id: order.id },
+          data: { status: 'CONFIRMED', paymentStatus: 'SUCCEEDED' },
+        });
+
+        try {
+          await emailService.sendOrderConfirmed(
+            order.user.email,
+            order.user.name,
+            order.id,
+            order.totalAmount.toNumber(),
+            order.items.length,
+          );
+        } catch {
+          // Email failure should not break webhook response
+        }
+      } else {
+        // Pedido existe mas não está RESERVED (ex.: já CONFIRMED por reentrega
+        // anterior, ou CANCELLED por reserva expirada). Marcamos o pagamento
+        // como SUCCEEDED para conciliação e registramos se foi pago após
+        // cancelamento (caso a janela de reserva precise de ajuste).
+        if (order.status === 'CANCELLED') {
+          logger.warn(
+            { orderId: order.id, paymentIntentId },
+            'Pagamento confirmado para pedido CANCELLED — verificar janela de reserva',
+          );
+        }
+        await prisma.order.update({
+          where: { id: order.id },
+          data: { paymentStatus: 'SUCCEEDED' },
+        });
+      }
+    }
+
+    if (event.type === 'payment_intent.payment_failed') {
+      const paymentIntent = event.data.object;
+      await prisma.order.updateMany({
         where: { paymentIntentId: paymentIntent.id },
         data: { paymentStatus: 'FAILED' },
-      })
-      .catch(() => {
-        // Defensive: missing order is not a webhook failure.
       });
+    }
+  } catch (err) {
+    // O processamento falhou após reivindicar o evento. Liberamos a claim para
+    // que o retry do Stripe consiga reprocessar, e propagamos o erro (→ 500),
+    // sinalizando ao Stripe que deve reentregar.
+    await prisma.idempotencyRecord
+      .delete({ where: { key: claimKey } })
+      .catch(() => {
+        // Claim já removida/expirada — nada a fazer.
+      });
+    throw err;
   }
 
   void reply.status(200).send({ received: true });

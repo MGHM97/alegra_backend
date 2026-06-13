@@ -3,6 +3,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../../infra/database/prisma-client.js';
 import { PrismaUserRepository } from '../../infra/database/prisma-user-repository.js';
 import { hashPassword } from '../../shared/utils/password.js';
+import { hashToken } from '../../shared/utils/token-hash.js';
 import { successResponse } from '../../shared/utils/response.js';
 import { NotFoundError, ValidationError } from '../../domain/errors/app-error.js';
 import type { ForgotPasswordInput, ResetPasswordInput } from '../schemas/password-reset-schemas.js';
@@ -10,10 +11,6 @@ import { EmailService } from '../../application/services/email-service.js';
 
 const userRepository = new PrismaUserRepository();
 const emailService = new EmailService();
-
-function hashToken(token: string): string {
-  return crypto.createHash('sha256').update(token).digest('hex');
-}
 
 export async function forgotPasswordHandler(
   request: FastifyRequest<{ Body: ForgotPasswordInput }>,
@@ -27,7 +24,7 @@ export async function forgotPasswordHandler(
   if (!user) {
     void reply
       .status(200)
-      .send(successResponse({ message: 'Se o e-mail estiver cadastrado, voce recebera as instrucoes de recuperacao.' }));
+      .send(successResponse({ message: 'Se o e-mail estiver cadastrado, você receberá as instruções de recuperação.' }));
     return;
   }
 
@@ -75,12 +72,12 @@ export async function resetPasswordHandler(
   });
 
   if (!resetRecord) {
-    throw new NotFoundError('Token de recuperacao invalido ou expirado');
+    throw new NotFoundError('Token de recuperação inválido ou expirado');
   }
 
   const user = await userRepository.findById(resetRecord.userId);
   if (!user) {
-    throw new NotFoundError('Usuario nao encontrado');
+    throw new NotFoundError('Usuário não encontrado');
   }
 
   if (!user.isActive) {
@@ -111,5 +108,5 @@ export async function resetPasswordHandler(
 
   void reply
     .status(200)
-    .send(successResponse({ message: 'Senha alterada com sucesso. Faca login com sua nova senha.' }));
+    .send(successResponse({ message: 'Senha alterada com sucesso. Faça login com sua nova senha.' }));
 }

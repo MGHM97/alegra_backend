@@ -1,4 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { Prisma } from '@prisma/client';
 import { PrismaReviewRepository } from '../../infra/database/prisma-review-repository.js';
 import type { CreateReviewInput } from '../schemas/review-schemas.js';
 import { successResponse } from '../../shared/utils/response.js';
@@ -93,15 +94,30 @@ export async function createReviewHandler(
     throw new ReviewNotVerifiedPurchaseError();
   }
 
-  const review = await reviewRepository.create({
-    userId: currentUser.sub,
-    productId,
-    userName: currentUser.email.split('@')[0] ?? 'Anonymous',
-    rating,
-    comment,
-    photos,
-    isVerifiedPurchase: true,
-  });
+  let review;
+  try {
+    review = await reviewRepository.create({
+      userId: currentUser.sub,
+      productId,
+      userName: currentUser.email.split('@')[0] ?? 'Anonymous',
+      rating,
+      comment,
+      photos,
+      isVerifiedPurchase: true,
+    });
+  } catch (err) {
+    // Corrida: dois POST simultâneos do mesmo usuário para o mesmo produto
+    // passam ambos no findByUserAndProduct acima; a constraint @@unique
+    // ([userId, productId]) barra o segundo com P2002. Traduzimos para 409
+    // em vez de vazar um 500 (INTERNAL_ERROR).
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2002'
+    ) {
+      throw new ReviewAlreadyExistsError();
+    }
+    throw err;
+  }
 
   void reply.status(201).send(successResponse(serializeReview(review)));
 }

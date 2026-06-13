@@ -110,7 +110,7 @@ model NewsletterSubscriber {
 
 model RefreshToken {
   id        String   @id @default(uuid())
-  token     String   @unique
+  tokenHash String   @unique @map("token_hash")
   userId    String   @map("user_id")
   expiresAt DateTime @map("expires_at")
   createdAt DateTime @default(now()) @map("created_at")
@@ -119,7 +119,7 @@ model RefreshToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([token])
+  @@index([tokenHash])
   @@map("refresh_tokens")
 }
 
@@ -201,6 +201,8 @@ model Order {
   discountAmount    Decimal?    @map("discount_amount") @db.Decimal(12, 2)
   paymentMethod     PaymentMethod? @map("payment_method")
   paymentStatus     PaymentStatus? @map("payment_status")
+  installments      Int         @default(1)
+  installmentFee    Decimal?    @map("installment_fee") @db.Decimal(12, 2)
   pixQrCode         String?     @map("pix_qr_code")
   pixQrCodeText     String?     @map("pix_qr_code_text")
   pixExpiresAt      DateTime?   @map("pix_expires_at")
@@ -327,6 +329,11 @@ model SavedCard {
   holderDocument String?   @map("holder_document")
   issuer         String?   @db.VarChar(100)
   isDefault      Boolean   @default(false) @map("is_default")
+  // Tokenização Stripe: preenchidos quando o cartão é salvo via SetupIntent
+  // (Stripe.js no frontend). Sem eles, a cobrança off-session é bloqueada
+  // com erro claro — nunca enviamos um id interno como se fosse pm_ da Stripe.
+  stripePaymentMethodId String? @map("stripe_payment_method_id")
+  stripeCustomerId      String? @map("stripe_customer_id")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 

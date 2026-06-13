@@ -35,6 +35,7 @@ export interface CreateOrderInput {
   paymentIntentId?: string;
   paymentMethod?: PaymentMethod;
   paymentStatus?: PaymentStatus;
+  installments?: number;
   savedCardId?: string;
   pixQrCode?: string;
   pixQrCodeText?: string;

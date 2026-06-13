@@ -19,8 +19,11 @@
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:studio": "prisma studio",
     "migrate": "prisma generate && prisma db push",
+    "migrate:deploy": "prisma migrate deploy",
+    "db:baseline": "prisma migrate resolve --applied 0_init",
     "seed": "tsx prisma/seed.ts",
-    "setup": "prisma generate && prisma db push && tsx prisma/seed.ts"
+    "setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
+    "setup:prod": "prisma generate && prisma migrate deploy"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

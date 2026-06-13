@@ -56,6 +56,8 @@ export interface OrderEntity {
   discountAmount: Decimal | null;
   paymentMethod: PaymentMethod | null;
   paymentStatus: PaymentStatus | null;
+  installments: number;
+  installmentFee: Decimal | null;
   pixQrCode: string | null;
   pixQrCodeText: string | null;
   pixExpiresAt: Date | null;

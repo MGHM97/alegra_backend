@@ -22,18 +22,11 @@ export interface PixData {
   expiresAt: string;
 }
 
-export interface BoletoData {
-  pdfUrl: string;
-  barcodeNumber: string;
-  expiresAt: string;
-}
-
 export interface PaymentIntentResult {
   paymentIntentId: string;
   clientSecret: string;
   status: string;
   pixData: PixData | null;
-  boletoData: BoletoData | null;
 }
 
 export class PaymentService {
@@ -43,7 +36,6 @@ export class PaymentService {
    * - `card`: lets Stripe Elements pick the method on the frontend
    *   (`automatic_payment_methods` + restricted to `card`).
    * - `pix`: confirms server-side; Stripe returns `next_action.pix_display_qr_code`.
-   * - `boleto`: confirms server-side; Stripe returns `next_action.boleto_display_details`.
    * - `saved_card`: passes `payment_method` + `confirm: true` + `off_session: true`.
    *   May still come back as `requires_action` (3DS) which the frontend handles.
    *
@@ -66,17 +58,6 @@ export class PaymentService {
       });
 
       return this.toResult(intent, 'pix');
-    }
-
-    if (paymentMethod === 'boleto') {
-      const intent = await stripe.paymentIntents.create({
-        amount: amountInCents,
-        currency: lowerCurrency,
-        payment_method_types: ['boleto'],
-        metadata,
-      });
-
-      return this.toResult(intent, 'boleto');
     }
 
     if (paymentMethod === 'saved_card') {
@@ -144,7 +125,6 @@ export class PaymentService {
     }
 
     let pixData: PixData | null = null;
-    let boletoData: BoletoData | null = null;
 
     const nextAction = intent.next_action;
 
@@ -161,25 +141,11 @@ export class PaymentService {
       }
     }
 
-    if (method === 'boleto' && nextAction?.type === 'boleto_display_details') {
-      const details = nextAction.boleto_display_details;
-      if (details) {
-        boletoData = {
-          pdfUrl: details.hosted_voucher_url ?? '',
-          barcodeNumber: details.number ?? '',
-          expiresAt: details.expires_at
-            ? new Date(details.expires_at * 1000).toISOString()
-            : new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-        };
-      }
-    }
-
     return {
       paymentIntentId: intent.id,
       clientSecret: intent.client_secret,
       status: intent.status,
       pixData,
-      boletoData,
     };
   }
 

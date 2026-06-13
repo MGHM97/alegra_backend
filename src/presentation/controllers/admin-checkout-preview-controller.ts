@@ -63,19 +63,6 @@ function buildFakePixData(): {
   };
 }
 
-function buildFakeBoletoData(): {
-  pdfUrl: string;
-  barcodeNumber: string;
-  expiresAt: string;
-} {
-  const expires = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // 3 days
-  return {
-    pdfUrl: '#preview',
-    barcodeNumber: '00190.00009 02394.000007 03003.000004 8 99990000000150',
-    expiresAt: expires.toISOString(),
-  };
-}
-
 /**
  * POST /v1/admin/checkout-preview/create-intent
  *
@@ -161,15 +148,13 @@ export async function createPreviewIntentHandler(
   // Method-specific fake data — same shape the real /payments/create-intent
   // would return for these methods.
   const pixData = paymentMethod === 'pix' ? buildFakePixData() : null;
-  const boletoData = paymentMethod === 'boleto' ? buildFakeBoletoData() : null;
 
   // Status mirrors what real Stripe would return per method:
   // - pix: 'requires_action' (waiting on QR scan)
-  // - boleto: 'requires_action' (waiting on barcode payment)
   // - card: 'requires_payment_method' (PaymentElement still needed on FE)
   // - saved_card: 'succeeded' (off_session confirm)
   let status: string;
-  if (paymentMethod === 'pix' || paymentMethod === 'boleto') {
+  if (paymentMethod === 'pix') {
     status = 'requires_action';
   } else if (paymentMethod === 'saved_card') {
     status = 'succeeded';
@@ -205,7 +190,6 @@ export async function createPreviewIntentHandler(
         ? { id: appliedCouponId, code: appliedCouponCode }
         : null,
       pixData,
-      boletoData,
       isPreview: true,
     }),
   );
@@ -385,24 +369,19 @@ export async function createPreviewOrderHandler(
 
   // Method-specific fake payment payload (same shape as create-intent).
   const pixData = paymentMethod === 'pix' ? buildFakePixData() : null;
-  const boletoData = paymentMethod === 'boleto' ? buildFakeBoletoData() : null;
 
   const previewId = `preview_admin_${randomUUID()}`;
   const previewNumber = `PREVIEW-${randomUUID().slice(0, 8).toUpperCase()}`;
   const now = new Date();
 
-  // For PIX/Boleto in preview, the order represents an "awaiting payment"
-  // state to faithfully mirror the real customer experience. CARD/SAVED_CARD
-  // remain CONFIRMED since the simulated confirm step already succeeded.
+  // For PIX in preview, the order represents an "awaiting payment" state to
+  // faithfully mirror the real customer experience. CARD/SAVED_CARD remain
+  // CONFIRMED since the simulated confirm step already succeeded.
   const orderStatus: 'CONFIRMED' | 'RESERVED' =
-    paymentMethod === 'pix' || paymentMethod === 'boleto'
-      ? 'RESERVED'
-      : 'CONFIRMED';
+    paymentMethod === 'pix' ? 'RESERVED' : 'CONFIRMED';
 
   const paymentStatus: string =
-    paymentMethod === 'pix' || paymentMethod === 'boleto'
-      ? 'requires_action'
-      : 'succeeded';
+    paymentMethod === 'pix' ? 'requires_action' : 'succeeded';
 
   const fakeOrder = {
     id: previewId,
@@ -428,9 +407,9 @@ export async function createPreviewOrderHandler(
     pixQrCode: pixData?.qrCodeImage ?? null,
     pixQrCodeText: pixData?.qrCodeText ?? null,
     pixExpiresAt: pixData?.expiresAt ?? null,
-    boletoUrl: boletoData?.pdfUrl ?? null,
-    boletoBarcode: boletoData?.barcodeNumber ?? null,
-    boletoExpiresAt: boletoData?.expiresAt ?? null,
+    boletoUrl: null,
+    boletoBarcode: null,
+    boletoExpiresAt: null,
     savedCardId: savedCardId ?? null,
     installments: installments ?? 1,
     createdAt: now,

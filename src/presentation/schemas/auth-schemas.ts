@@ -2,32 +2,32 @@ import { z } from 'zod';
 
 const usernameSchema = z
   .string()
-  .min(3, 'Username must be at least 3 characters')
-  .max(20, 'Username must be at most 20 characters')
+  .min(3, 'O usuário deve ter no mínimo 3 caracteres')
+  .max(20, 'O usuário deve ter no máximo 20 caracteres')
   .regex(
     /^[a-zA-Z][a-zA-Z0-9_]*$/,
-    'Username must start with a letter and contain only letters, numbers, and underscores',
+    'O usuário deve começar com uma letra e conter apenas letras, números e underline',
   )
   .transform((v) => v.toLowerCase().trim());
 
 export const registerSchema = z.object({
   email: z
     .string()
-    .email('Invalid email format')
+    .email('Formato de e-mail inválido')
     .max(255)
     .transform((v) => v.toLowerCase().trim()),
   username: usernameSchema,
   password: z
     .string()
-    .min(8, 'Password must be at least 8 characters')
+    .min(8, 'A senha deve ter no mínimo 8 caracteres')
     .max(128)
     .regex(
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-      'Password must contain at least one lowercase, one uppercase, and one digit',
+      'A senha deve conter pelo menos uma letra minúscula, uma maiúscula e um dígito',
     ),
   name: z
     .string()
-    .min(2, 'Name must be at least 2 characters')
+    .min(2, 'O nome deve ter no mínimo 2 caracteres')
     .max(100)
     .transform((v) => v.trim()),
 });
@@ -35,10 +35,10 @@ export const registerSchema = z.object({
 export const loginSchema = z.object({
   identifier: z
     .string()
-    .min(1, 'Email or username is required')
+    .min(1, 'Informe seu e-mail ou usuário')
     .max(255)
     .transform((v) => v.trim().toLowerCase()),
-  password: z.string().min(1, 'Password is required').max(128),
+  password: z.string().min(1, 'Informe sua senha').max(128),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
@@ -47,13 +47,13 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export const updateProfileSchema = z.object({
   name: z
     .string()
-    .min(2, 'Nome deve ter no minimo 2 caracteres')
+    .min(2, 'O nome deve ter no mínimo 2 caracteres')
     .max(100)
     .transform((v) => v.trim())
     .optional(),
   phone: z
     .string()
-    .regex(/^\d{10,11}$/, 'Telefone deve ter 10 ou 11 digitos')
+    .regex(/^\d{10,11}$/, 'O telefone deve ter 10 ou 11 dígitos')
     .optional(),
 });
 

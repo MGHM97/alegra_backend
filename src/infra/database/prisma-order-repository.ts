@@ -14,6 +14,7 @@ import {
   reserveCouponUsage,
 } from '../../application/services/coupon-service.js';
 import type { Coupon } from '../../domain/entities/coupon.js';
+import { computeInstallmentFee } from '../../shared/utils/installments.js';
 
 const STOCK_RESERVATION_MINUTES = 15;
 
@@ -99,7 +100,16 @@ export class PrismaOrderRepository implements OrderRepository {
   }
 
   async create(data: CreateOrderInput): Promise<OrderEntity> {
-    const reservedUntil = new Date(Date.now() + STOCK_RESERVATION_MINUTES * 60 * 1000);
+    // A janela de reserva DEVE cobrir o prazo de pagamento, senão o job de
+    // cleanup libera o estoque enquanto o cliente ainda pode pagar (PIX 30min,
+    // boleto dias) — gerando oversell e pedidos "pagos porém cancelados".
+    // Cartão é cobrado na hora, então 15min basta.
+    let reservedUntil = new Date(Date.now() + STOCK_RESERVATION_MINUTES * 60 * 1000);
+    if (data.paymentMethod === 'PIX' && data.pixExpiresAt) {
+      reservedUntil = new Date(data.pixExpiresAt);
+    } else if (data.paymentMethod === 'BOLETO' && data.boletoExpiresAt) {
+      reservedUntil = new Date(data.boletoExpiresAt);
+    }
 
     // Pre-fetch the coupon outside the transaction for early validation.
     // The atomic reservation (reserveCouponUsage) still happens inside
@@ -127,7 +137,7 @@ export class PrismaOrderRepository implements OrderRepository {
       }
     }
 
-    const order = await prisma.$transaction(async (tx) => {
+    const createOrderTx = () => prisma.$transaction(async (tx) => {
       for (const item of data.items) {
         const product = await tx.product.findUnique({
           where: { id: item.productId },
@@ -189,11 +199,24 @@ export class PrismaOrderRepository implements OrderRepository {
       const totalAmount =
         Math.round((subtotal - discountAmount + shippingCost) * 100) / 100;
 
+      // Juros de parcelamento (acima de 3x no cartão). Gravados no pedido para
+      // que totalAmount + installmentFee == valor cobrado pela Stripe — sem
+      // discrepância contábil entre o pedido e a cobrança.
+      const installments = data.installments ?? 1;
+      const installmentFee = computeInstallmentFee(
+        totalAmount,
+        data.paymentMethod,
+        installments,
+      );
+
       const newOrder = await tx.order.create({
         data: {
           userId: data.userId,
           status: 'RESERVED',
           totalAmount: new Prisma.Decimal(totalAmount),
+          installments,
+          installmentFee:
+            installmentFee > 0 ? new Prisma.Decimal(installmentFee) : null,
           idempotencyKey: data.idempotencyKey,
           paymentIntentId: data.paymentIntentId,
           reservedUntil,
@@ -240,6 +263,25 @@ export class PrismaOrderRepository implements OrderRepository {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       timeout: 10000,
     });
+
+    // Retry em falhas de serialização (P2034). Sob Serializable, duas
+    // transações concorrentes sobre o mesmo produto podem abortar uma à outra;
+    // reexecutamos até 3x antes de propagar, em vez de devolver 500 ao cliente.
+    const order = await (async () => {
+      for (let attempt = 1; ; attempt++) {
+        try {
+          return await createOrderTx();
+        } catch (err) {
+          const isSerializationFailure =
+            err instanceof Prisma.PrismaClientKnownRequestError &&
+            err.code === 'P2034';
+          if (isSerializationFailure && attempt < 3) {
+            continue;
+          }
+          throw err;
+        }
+      }
+    })();
 
     return order as OrderEntity;
   }

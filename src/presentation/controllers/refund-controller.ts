@@ -3,6 +3,7 @@ import { prisma } from '../../infra/database/prisma-client.js';
 import { PaymentService } from '../../application/services/payment-service.js';
 import { successResponse } from '../../shared/utils/response.js';
 import { NotFoundError, ValidationError } from '../../domain/errors/app-error.js';
+import { releaseCouponUsage } from '../../application/services/coupon-service.js';
 
 const paymentService = new PaymentService();
 
@@ -30,7 +31,17 @@ export async function refundOrderHandler(
   }
 
   if (!order.paymentIntentId) {
-    throw new ValidationError('Pedido nao possui pagamento vinculado para estorno.');
+    throw new ValidationError('Pedido não possui pagamento vinculado para estorno.');
+  }
+
+  // O Stripe só estorna PaymentIntents efetivamente pagos. Um pedido pode estar
+  // CONFIRMED/PROCESSING com paymentStatus != SUCCEEDED (ex.: falha tardia ou
+  // confirmação manual). Sem este guard, createRefund() lançaria erro do Stripe
+  // após já termos passado das validações de negócio.
+  if (order.paymentStatus !== 'SUCCEEDED') {
+    throw new ValidationError(
+      'Apenas pedidos com pagamento confirmado (SUCCEEDED) podem ser estornados.',
+    );
   }
 
   const refundId = await paymentService.createRefund(order.paymentIntentId);
@@ -50,6 +61,13 @@ export async function refundOrderHandler(
           reason: `Refund for order ${order.id} (refund: ${refundId})`,
         },
       });
+    }
+
+    // Devolve o "slot" do cupom (consistente com o cancelamento via admin).
+    // Sem isto, um cupom com maxUses fica permanentemente consumido após o
+    // estorno e ninguém mais consegue utilizá-lo.
+    if (order.couponId) {
+      await releaseCouponUsage(tx, order.couponId);
     }
 
     await tx.order.update({

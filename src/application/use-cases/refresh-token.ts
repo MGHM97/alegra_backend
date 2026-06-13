@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { UnauthorizedError } from '../../domain/errors/app-error.js';
 import { verifyRefreshToken, signAccessToken, signRefreshToken } from '../../shared/utils/jwt.js';
+import { hashToken } from '../../shared/utils/token-hash.js';
 import { prisma } from '../../infra/database/prisma-client.js';
 
 interface RefreshResult {
@@ -19,6 +20,14 @@ export class RefreshTokenUseCase {
 
     if (!storedToken || storedToken.revokedAt) {
       throw new UnauthorizedError('Refresh token has been revoked');
+    }
+
+    // Liga a linha do DB ao token efetivamente apresentado. O lookup acima é
+    // por tokenId (claim do JWT); sem esta checagem, um token com tokenId
+    // válido mas corpo divergente passaria. Comparamos hashes (constante por
+    // SHA-256, valores de tamanho fixo) — o texto puro nunca toca o banco.
+    if (storedToken.tokenHash !== hashToken(currentRefreshToken)) {
+      throw new UnauthorizedError('Refresh token mismatch');
     }
 
     if (storedToken.expiresAt < new Date()) {
@@ -50,7 +59,7 @@ export class RefreshTokenUseCase {
     await prisma.refreshToken.create({
       data: {
         id: newTokenId,
-        token: refreshToken,
+        tokenHash: hashToken(refreshToken),
         userId: storedToken.user.id,
         expiresAt,
       },

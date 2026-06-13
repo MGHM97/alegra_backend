@@ -1842,6 +1842,16 @@ const PRODUCTS = [
 ] as const;
 
 async function main() {
+  // Guard de segurança: o seed popula DADOS DE DEMONSTRAÇÃO (produtos fictícios,
+  // imagens externas, admin com senha padrão). Nunca deve rodar em produção.
+  // Use SEED_FORCE=true apenas para um seeding intencional e controlado.
+  if (process.env.NODE_ENV === 'production' && process.env.SEED_FORCE !== 'true') {
+    console.error(
+      'Seed bloqueado: NODE_ENV=production. Defina SEED_FORCE=true para forçar (não recomendado em produção).'
+    );
+    process.exit(1);
+  }
+
   console.log('Seeding database...');
 
   const adminPasswordHash = await bcrypt.hash('Admin@123456', 12);

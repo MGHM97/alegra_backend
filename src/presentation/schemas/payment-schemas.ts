@@ -15,15 +15,17 @@ const paymentItemSchema = z.object({
  *
  * - `pix`: instantaneous Brazilian payment system. Backend confirms the
  *   intent and returns a QR code; user scans it with their bank app.
- * - `boleto`: printable bank slip. Backend confirms the intent and returns
- *   a PDF URL + barcode; clears in 1-3 business days.
  * - `card`: brand new card via Stripe Elements (PaymentElement). Frontend
  *   confirms via stripe.confirmPayment().
  * - `saved_card`: previously stored card (PCI-compliant via Stripe payment
  *   method id). Backend confirms with `confirm: true` + `off_session: true`,
  *   may require 3DS challenge handled by the frontend.
+ *
+ * Boleto foi descontinuado: removido do contrato de entrada. Colunas de
+ * boleto no banco e o enum Prisma BOLETO permanecem apenas para preservar
+ * pedidos históricos.
  */
-export const paymentMethodSchema = z.enum(['pix', 'boleto', 'card', 'saved_card']);
+export const paymentMethodSchema = z.enum(['pix', 'card', 'saved_card']);
 export type PaymentMethodKey = z.infer<typeof paymentMethodSchema>;
 
 export const createPaymentIntentSchema = z
