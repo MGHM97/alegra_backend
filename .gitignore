@@ -5,3 +5,5 @@ dist-seed/
 *.log
 .DS_Store
 coverage/
+public/uploads/
+!public/uploads/products/.gitkeep

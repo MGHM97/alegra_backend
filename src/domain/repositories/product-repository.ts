@@ -40,6 +40,7 @@ export interface CreateProductInput {
   isActive?: boolean;
   maxInstallments?: number;
   installmentPrice?: number | null;
+  videoUrl?: string | null;
 }
 
 export interface UpdateProductInput {
@@ -62,6 +63,7 @@ export interface UpdateProductInput {
   isActive?: boolean;
   maxInstallments?: number;
   installmentPrice?: number | null;
+  videoUrl?: string | null;
 }
 
 export interface ProductRepository {

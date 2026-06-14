@@ -48,6 +48,7 @@ function serializeProduct(product: {
   isActive: boolean;
   maxInstallments: number;
   installmentPrice: unknown;
+  videoUrl: string | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -74,6 +75,7 @@ function serializeProduct(product: {
     isActive: product.isActive,
     maxInstallments: product.maxInstallments,
     installmentPrice: product.installmentPrice ? Number(product.installmentPrice) : null,
+    videoUrl: product.videoUrl,
     createdAt: product.createdAt.toISOString(),
     updatedAt: product.updatedAt.toISOString(),
   };

@@ -1,8 +1,11 @@
+import path from 'node:path';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
+import multipart from '@fastify/multipart';
+import staticFiles from '@fastify/static';
 import { env } from './infra/config/env.js';
 import { registerRoutes } from './presentation/routes/index.js';
 import { globalErrorHandler } from './shared/middlewares/error-handler.js';
@@ -39,6 +42,24 @@ export async function buildApp() {
       }
     },
   );
+
+  // Serve arquivos estáticos de upload (imagens de produtos).
+  // __dirname: no dev (tsx/CJS) aponta para src/, em produção (dist/) aponta para dist/
+  // Em ambos os casos, '..' sobe para a raiz do projeto onde está public/uploads.
+  const uploadsRoot = path.join(__dirname, '..', 'public', 'uploads');
+  await fastify.register(staticFiles, {
+    root: uploadsRoot,
+    prefix: '/uploads',
+    decorateReply: false,
+  });
+
+  // Multipart para upload de imagens (coexiste com o parser JSON customizado do Stripe)
+  await fastify.register(multipart, {
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5 MB por arquivo
+      files: 5,
+    },
+  });
 
   await fastify.register(helmet, {
     contentSecurityPolicy: env.NODE_ENV === 'production',

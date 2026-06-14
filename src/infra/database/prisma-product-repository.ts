@@ -122,6 +122,7 @@ export class PrismaProductRepository implements ProductRepository {
         isActive: data.isActive ?? true,
         maxInstallments: data.maxInstallments ?? 1,
         installmentPrice: data.installmentPrice ?? null,
+        videoUrl: data.videoUrl ?? null,
       },
     });
     return product as unknown as ProductEntity;
@@ -149,6 +150,7 @@ export class PrismaProductRepository implements ProductRepository {
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
     if (data.maxInstallments !== undefined) updateData.maxInstallments = data.maxInstallments;
     if (data.installmentPrice !== undefined) updateData.installmentPrice = data.installmentPrice;
+    if (data.videoUrl !== undefined) updateData.videoUrl = data.videoUrl;
 
     const product = await prisma.product.update({
       where: { id },

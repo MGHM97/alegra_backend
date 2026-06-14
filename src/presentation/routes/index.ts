@@ -13,12 +13,15 @@ import { adminCouponRoutes } from './admin-coupon-routes.js';
 import { adminMetricsRoutes } from './admin-metrics-routes.js';
 import { adminReviewRoutes } from './admin-review-routes.js';
 import { adminCheckoutPreviewRoutes } from './admin-checkout-preview-routes.js';
+import { adminSeasonalCampaignRoutes } from './admin-seasonal-campaign-routes.js';
+import { adminUploadRoutes } from './admin-upload-routes.js';
 import { shippingRoutes } from './shipping-routes.js';
 import { paymentRoutes } from './payment-routes.js';
 import { contactRoutes } from './contact-routes.js';
 import { couponRoutes } from './coupon-routes.js';
 import { wishlistRoutes } from './wishlist-routes.js';
 import { newsletterRoutes } from './newsletter-routes.js';
+import { seasonalRoutes } from './seasonal-routes.js';
 
 export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   await fastify.register(authRoutes, { prefix: '/v1/auth' });
@@ -30,6 +33,7 @@ export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   await fastify.register(reviewRoutes, { prefix: '/v1/reviews' });
   await fastify.register(couponRoutes, { prefix: '/v1/coupons' });
   await fastify.register(wishlistRoutes, { prefix: '/v1/wishlist' });
+  await fastify.register(seasonalRoutes, { prefix: '/v1/seasonal' });
   await fastify.register(adminProductRoutes, { prefix: '/v1/admin/products' });
   await fastify.register(adminOrderRoutes, { prefix: '/v1/admin/orders' });
   await fastify.register(adminUserRoutes, { prefix: '/v1/admin/users' });
@@ -39,6 +43,10 @@ export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   await fastify.register(adminCheckoutPreviewRoutes, {
     prefix: '/v1/admin/checkout-preview',
   });
+  await fastify.register(adminSeasonalCampaignRoutes, {
+    prefix: '/v1/admin/seasonal-campaigns',
+  });
+  await fastify.register(adminUploadRoutes, { prefix: '/v1/admin/uploads' });
   await fastify.register(shippingRoutes, { prefix: '/v1/shipping' });
   await fastify.register(paymentRoutes, { prefix: '/v1/payments' });
   await fastify.register(contactRoutes, { prefix: '/v1/contact' });

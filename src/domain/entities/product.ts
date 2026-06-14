@@ -22,6 +22,7 @@ export interface ProductEntity {
   isActive: boolean;
   maxInstallments: number;
   installmentPrice: Decimal | null;
+  videoUrl: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

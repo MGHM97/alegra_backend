@@ -9,7 +9,10 @@ export const createProductSchema = z.object({
   currency: z.string().length(3).default('BRL'),
   category: z.string().min(1, 'Categoria é obrigatória').max(50),
   subcategory: z.string().max(50).nullable().optional(),
-  images: z.array(z.string().url()).min(1, 'Pelo menos uma imagem é obrigatória'),
+  images: z
+    .array(z.string().url())
+    .min(1, 'Envie ao menos 1 imagem.')
+    .max(5, 'Envie no máximo 5 imagens.'),
   thumbnailUrl: z.string().url(),
   badges: z.array(z.string().max(30)).optional().default([]),
   specifications: z.record(z.string(), z.unknown()).optional().default({}),
@@ -19,6 +22,7 @@ export const createProductSchema = z.object({
   isActive: z.boolean().optional().default(true),
   maxInstallments: z.number().int().min(1).max(12).optional().default(1),
   installmentPrice: z.number().positive().nullable().optional(),
+  videoUrl: z.string().url('URL de vídeo inválida.').nullable().optional(),
 });
 
 export type CreateProductInput = z.infer<typeof createProductSchema>;
@@ -32,7 +36,11 @@ export const updateProductSchema = z.object({
   currency: z.string().length(3).optional(),
   category: z.string().min(1).max(50).optional(),
   subcategory: z.string().max(50).nullable().optional(),
-  images: z.array(z.string().url()).optional(),
+  images: z
+    .array(z.string().url())
+    .min(1, 'Envie ao menos 1 imagem.')
+    .max(5, 'Envie no máximo 5 imagens.')
+    .optional(),
   thumbnailUrl: z.string().url().optional(),
   slug: z.string().min(1).max(200).optional(),
   badges: z.array(z.string().max(30)).optional(),
@@ -43,6 +51,7 @@ export const updateProductSchema = z.object({
   isActive: z.boolean().optional(),
   maxInstallments: z.number().int().min(1).max(12).optional(),
   installmentPrice: z.number().positive().nullable().optional(),
+  videoUrl: z.string().url('URL de vídeo inválida.').nullable().optional(),
 });
 
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;
