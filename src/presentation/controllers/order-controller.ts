@@ -5,14 +5,17 @@ import { successResponse } from '../../shared/utils/response.js';
 import {
   ForbiddenError,
   NotFoundError,
+  OrderStateConflictError,
   UnauthorizedError,
   ValidationError,
 } from '../../domain/errors/app-error.js';
 import { prisma } from '../../infra/database/prisma-client.js';
 import { releaseCouponUsage } from '../../application/services/coupon-service.js';
+import { InventoryService } from '../../application/services/inventory-service.js';
 import type { PaymentMethod, PaymentStatus } from '../../domain/entities/order.js';
 
 const orderRepository = new PrismaOrderRepository();
+const inventoryService = new InventoryService();
 
 /**
  * Maps the lowercase payment-method key used on the wire to the uppercase
@@ -421,31 +424,36 @@ export async function cancelOrderHandler(
   }
 
   await prisma.$transaction(async (tx) => {
-    for (const item of order.items) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { reservedStock: { decrement: item.quantity } },
-      });
+    // Reivindica a transição atomicamente: se o pedido já saiu do status lido
+    // acima (ex.: pagamento confirmado pelo webhook ou cancelamento
+    // concorrente pelo admin), count === 0 e abortamos antes de tocar no
+    // estoque — evitando decremento duplo de reservedStock.
+    const claim = await tx.order.updateMany({
+      where: { id: order.id, status: order.status },
+      data: { status: 'CANCELLED' },
+    });
 
-      await tx.inventoryLog.create({
-        data: {
-          productId: item.productId,
-          action: 'RESERVATION_RELEASE',
-          quantity: item.quantity,
-          reason: `Customer cancelled order ${order.id}`,
-        },
-      });
+    if (claim.count === 0) {
+      throw new OrderStateConflictError(
+        'Pedido não pode ser cancelado no momento — o status mudou em outra operação. Recarregue e tente novamente.',
+      );
     }
+
+    // CANCELLABLE_STATUSES só permite PENDING/RESERVED (sempre pré-venda),
+    // então releaseOrderStock sempre libera a reserva aqui — mesmo caminho
+    // usado pelo cancelamento via admin, para manter a regra num só lugar.
+    await inventoryService.releaseOrderStock(
+      tx,
+      order.id,
+      order.items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+      order.status,
+      `Customer cancelled order ${order.id}`,
+    );
 
     // If the order used a coupon, release the reserved usage slot.
     if (order.couponId) {
       await releaseCouponUsage(tx, order.couponId);
     }
-
-    await tx.order.update({
-      where: { id: order.id },
-      data: { status: 'CANCELLED' },
-    });
   });
 
   void reply.status(200).send(successResponse({ message: 'Pedido cancelado com sucesso.' }));

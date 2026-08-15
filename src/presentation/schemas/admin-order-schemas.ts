@@ -13,20 +13,24 @@ export const adminOrderFiltersSchema = z.object({
 
 export type AdminOrderFiltersInput = z.infer<typeof adminOrderFiltersSchema>;
 
+// REFUNDED nunca é um destino manual aqui: apenas o endpoint dedicado
+// POST /v1/admin/orders/:id/refund pode levar um pedido a REFUNDED, pois
+// esse fluxo aciona o estorno real na Stripe. Marcar REFUNDED por aqui
+// mudaria o status sem devolver o dinheiro ao cliente.
 const VALID_TRANSITIONS: Record<string, string[]> = {
   PENDING: ['CONFIRMED', 'CANCELLED'],
   RESERVED: ['CONFIRMED', 'CANCELLED'],
   CONFIRMED: ['PROCESSING', 'CANCELLED'],
   PROCESSING: ['SHIPPED', 'CANCELLED'],
   SHIPPED: ['DELIVERED'],
-  DELIVERED: ['REFUNDED'],
+  DELIVERED: [],
 };
 
 export { VALID_TRANSITIONS };
 
 export const updateOrderStatusSchema = z.object({
   status: z.enum([
-    'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED',
+    'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED',
   ]),
   trackingCode: z.string().max(100).optional(),
   shippingCarrier: z.string().max(100).optional(),

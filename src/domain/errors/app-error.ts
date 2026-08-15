@@ -99,3 +99,25 @@ export class AccountAlreadyDeletedError extends AppError {
     super('Esta conta já foi excluída.', 409, 'ACCOUNT_ALREADY_DELETED');
   }
 }
+
+export class PriceMismatchError extends AppError {
+  constructor() {
+    super(
+      'O preço deste produto foi atualizado. Atualize seu carrinho e tente novamente.',
+      409,
+      'PRICE_MISMATCH',
+    );
+  }
+}
+
+/**
+ * Lançado quando um update atômico (updateMany com filtro de status) não
+ * afeta nenhuma linha — ou seja, o pedido já transicionou para outro status
+ * entre a leitura e a escrita (corrida entre cancelamento/estorno/atualização
+ * concorrentes). Indica ao chamador que a operação não é mais válida.
+ */
+export class OrderStateConflictError extends AppError {
+  constructor(message = 'O pedido foi alterado por outra operação. Recarregue e tente novamente.') {
+    super(message, 409, 'ORDER_STATE_CONFLICT');
+  }
+}

@@ -2,10 +2,16 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../../infra/database/prisma-client.js';
 import { PaymentService } from '../../application/services/payment-service.js';
 import { successResponse } from '../../shared/utils/response.js';
-import { NotFoundError, ValidationError } from '../../domain/errors/app-error.js';
+import {
+  NotFoundError,
+  OrderStateConflictError,
+  ValidationError,
+} from '../../domain/errors/app-error.js';
 import { releaseCouponUsage } from '../../application/services/coupon-service.js';
+import { InventoryService } from '../../application/services/inventory-service.js';
 
 const paymentService = new PaymentService();
+const inventoryService = new InventoryService();
 
 const REFUNDABLE_STATUSES = new Set(['CONFIRMED', 'PROCESSING']);
 
@@ -44,24 +50,48 @@ export async function refundOrderHandler(
     );
   }
 
-  const refundId = await paymentService.createRefund(order.paymentIntentId);
+  // Reivindica a transição para REFUNDED atomicamente ANTES de chamar a
+  // Stripe. Isso garante que, sob concorrência (ex.: dois cliques do admin,
+  // ou retry de rede), no máximo uma chamada consiga passar do claim — a
+  // segunda recebe count === 0 e nunca chega a chamar createRefund(), o que
+  // evitaria um estorno duplicado no Stripe.
+  const claim = await prisma.order.updateMany({
+    where: { id, status: order.status },
+    data: { status: 'REFUNDED' },
+  });
+
+  if (claim.count === 0) {
+    throw new OrderStateConflictError(
+      'Pedido não pode ser estornado no momento — o status mudou em outra operação. Recarregue e tente novamente.',
+    );
+  }
+
+  let refundId: string;
+  try {
+    refundId = await paymentService.createRefund(order.paymentIntentId);
+  } catch (err) {
+    // A Stripe recusou/falhou o estorno: reverte o claim para não deixar o
+    // pedido marcado como REFUNDED sem o dinheiro ter sido devolvido.
+    await prisma.order.update({
+      where: { id },
+      data: { status: order.status },
+    });
+    throw err;
+  }
 
   await prisma.$transaction(async (tx) => {
-    for (const item of order.items) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { reservedStock: { decrement: item.quantity } },
-      });
-
-      await tx.inventoryLog.create({
-        data: {
-          productId: item.productId,
-          action: 'RESERVATION_RELEASE',
-          quantity: item.quantity,
-          reason: `Refund for order ${order.id} (refund: ${refundId})`,
-        },
-      });
-    }
+    // order.status aqui é o status ANTES do claim (REFUNDABLE_STATUSES só
+    // permite CONFIRMED/PROCESSING, ambos pós-venda): commitSale já rodou na
+    // confirmação do pagamento, então devolvemos ao estoque físico (stock),
+    // nunca a reservedStock — senão reservedStock ficaria negativo e o
+    // estoque físico devolvido nunca voltaria.
+    await inventoryService.releaseOrderStock(
+      tx,
+      order.id,
+      order.items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+      order.status,
+      `Refund for order ${order.id} (refund: ${refundId})`,
+    );
 
     // Devolve o "slot" do cupom (consistente com o cancelamento via admin).
     // Sem isto, um cupom com maxUses fica permanentemente consumido após o
@@ -69,11 +99,6 @@ export async function refundOrderHandler(
     if (order.couponId) {
       await releaseCouponUsage(tx, order.couponId);
     }
-
-    await tx.order.update({
-      where: { id },
-      data: { status: 'REFUNDED' },
-    });
   });
 
   void reply.status(200).send(

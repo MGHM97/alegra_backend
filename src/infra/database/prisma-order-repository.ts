@@ -6,7 +6,7 @@ import type {
   OrderListFilters,
   OrderRepository,
 } from '../../domain/repositories/order-repository.js';
-import { InsufficientStockError } from '../../domain/errors/app-error.js';
+import { InsufficientStockError, PriceMismatchError } from '../../domain/errors/app-error.js';
 import {
   assertCouponUsable,
   computeDiscount,
@@ -17,6 +17,27 @@ import type { Coupon } from '../../domain/entities/coupon.js';
 import { computeInstallmentFee } from '../../shared/utils/installments.js';
 
 const STOCK_RESERVATION_MINUTES = 15;
+
+/**
+ * Verifica se um PrismaClientKnownRequestError é uma violação de unique
+ * constraint (P2002) sobre o campo indicado. O formato de `meta.target`
+ * varia entre versões do engine (array de nomes de campo ou string com o
+ * nome da constraint), então checamos as duas formas.
+ */
+function isUniqueConstraintViolation(err: unknown, fieldNameHint: string): boolean {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') {
+    return false;
+  }
+  const target = err.meta?.target;
+  const hint = fieldNameHint.toLowerCase();
+  if (Array.isArray(target)) {
+    return target.some((t) => typeof t === 'string' && t.toLowerCase().includes(hint));
+  }
+  if (typeof target === 'string') {
+    return target.toLowerCase().includes(hint);
+  }
+  return false;
+}
 
 const orderInclude = {
   items: true,
@@ -154,9 +175,7 @@ export class PrismaOrderRepository implements OrderRepository {
         }
 
         if (product.price.toNumber() !== item.unitPrice) {
-          throw new Error(
-            `Price mismatch for product ${product.name}: expected ${product.price.toNumber()}, received ${item.unitPrice}`,
-          );
+          throw new PriceMismatchError();
         }
 
         await tx.product.update({
@@ -267,10 +286,11 @@ export class PrismaOrderRepository implements OrderRepository {
     // Retry em falhas de serialização (P2034). Sob Serializable, duas
     // transações concorrentes sobre o mesmo produto podem abortar uma à outra;
     // reexecutamos até 3x antes de propagar, em vez de devolver 500 ao cliente.
-    const order = await (async () => {
+    const order = await (async (): Promise<OrderEntity> => {
       for (let attempt = 1; ; attempt++) {
         try {
-          return await createOrderTx();
+          const created = await createOrderTx();
+          return created as OrderEntity;
         } catch (err) {
           const isSerializationFailure =
             err instanceof Prisma.PrismaClientKnownRequestError &&
@@ -278,11 +298,25 @@ export class PrismaOrderRepository implements OrderRepository {
           if (isSerializationFailure && attempt < 3) {
             continue;
           }
+
+          // Corrida na idempotency key: duas requisições concorrentes com a
+          // mesma Idempotency-Key passam ambas pelo check prévio (não
+          // atômico) do controller e tentam criar o pedido. A constraint
+          // UNIQUE do banco barra a segunda com P2002 — em vez de propagar
+          // um 500, devolvemos o pedido que já existe (mesmo comportamento
+          // do caminho feliz de idempotência).
+          if (data.idempotencyKey && isUniqueConstraintViolation(err, 'idempotency')) {
+            const existing = await this.findByIdempotencyKey(data.idempotencyKey);
+            if (existing) {
+              return existing;
+            }
+          }
+
           throw err;
         }
       }
     })();
 
-    return order as OrderEntity;
+    return order;
   }
 }

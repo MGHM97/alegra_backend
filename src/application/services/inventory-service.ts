@@ -1,8 +1,25 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 import { prisma } from '../../infra/database/prisma-client.js';
 import { NotFoundError, InsufficientStockError } from '../../domain/errors/app-error.js';
 import type { InventorySyncInput } from '../../presentation/schemas/inventory-schemas.js';
+import type { OrderStatus } from '../../domain/entities/order.js';
 import { releaseCouponUsage } from './coupon-service.js';
+
+type TransactionClient = Omit<
+  PrismaClient,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>;
+
+export interface SaleOrderItem {
+  productId: string;
+  quantity: number;
+}
+
+// Status em que o pedido ainda NÃO teve sua reserva convertida em venda
+// (commitSale nunca rodou). Cancelar/estornar um pedido nesses status deve
+// apenas liberar a reserva (reservedStock); em qualquer status posterior,
+// stock físico já foi decrementado e precisa ser devolvido (stock).
+const PRE_SALE_STATUSES: ReadonlySet<OrderStatus> = new Set(['PENDING', 'RESERVED']);
 
 interface StockInfo {
   productId: string;
@@ -165,6 +182,109 @@ export class InventoryService {
     });
 
     return result;
+  }
+
+  /**
+   * Converte a reserva de estoque de um pedido em venda efetiva. Deve ser
+   * chamado dentro da MESMA transação (idealmente Serializable) que muda o
+   * status do pedido para CONFIRMED/PAID, garantindo que estoque e status
+   * fiquem consistentes mesmo sob concorrência ou falha no meio do caminho.
+   *
+   * Para cada item: `stock -= quantity` e `reservedStock -= quantity`
+   * (a reserva já havia incrementado reservedStock na criação do pedido).
+   * O decremento é condicional (updateMany com guarda de quantidade) para
+   * que o estoque jamais fique negativo, mesmo em cenários inesperados.
+   */
+  async commitSale(
+    tx: TransactionClient,
+    orderId: string,
+    items: SaleOrderItem[],
+  ): Promise<void> {
+    for (const item of items) {
+      const result = await tx.product.updateMany({
+        where: {
+          id: item.productId,
+          stock: { gte: item.quantity },
+          reservedStock: { gte: item.quantity },
+        },
+        data: {
+          stock: { decrement: item.quantity },
+          reservedStock: { decrement: item.quantity },
+        },
+      });
+
+      if (result.count === 0) {
+        throw new InsufficientStockError(item.productId, 0, item.quantity);
+      }
+
+      await tx.inventoryLog.create({
+        data: {
+          productId: item.productId,
+          action: 'SALE',
+          quantity: item.quantity,
+          reason: `Sale committed for order ${orderId}`,
+        },
+      });
+    }
+  }
+
+  /**
+   * Reverte o efeito de um pedido no estoque ao ser cancelado/estornado,
+   * escolhendo o ramo correto conforme o status de ORIGEM (`fromStatus`) do
+   * pedido — o status em que ele estava antes da transição de
+   * cancelamento/estorno ser reivindicada:
+   *
+   * - Pré-venda (PENDING/RESERVED): a reserva nunca virou venda (commitSale
+   *   não rodou). Libera a reserva: `reservedStock -= qty`,
+   *   InventoryLog.action = RESERVATION_RELEASE.
+   * - Pós-venda (CONFIRMED/PROCESSING/SHIPPED/DELIVERED): commitSale já
+   *   decrementou `stock` e `reservedStock` na confirmação do pagamento.
+   *   Devolve ao estoque físico: `stock += qty`, sem tocar reservedStock.
+   *   InventoryLog.action = RESTOCK.
+   *
+   * Chame dentro da MESMA transação que reivindica a transição de status.
+   */
+  async releaseOrderStock(
+    tx: TransactionClient,
+    orderId: string,
+    items: SaleOrderItem[],
+    fromStatus: OrderStatus,
+    reason: string,
+  ): Promise<void> {
+    const isPreSale = PRE_SALE_STATUSES.has(fromStatus);
+
+    for (const item of items) {
+      if (isPreSale) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { reservedStock: { decrement: item.quantity } },
+        });
+
+        await tx.inventoryLog.create({
+          data: {
+            productId: item.productId,
+            action: 'RESERVATION_RELEASE',
+            quantity: item.quantity,
+            reason,
+          },
+        });
+      } else {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: item.quantity } },
+        });
+
+        await tx.inventoryLog.create({
+          data: {
+            productId: item.productId,
+            action: 'RESTOCK',
+            quantity: item.quantity,
+            reason,
+            metadata: { orderId, restockedFromStatus: fromStatus },
+          },
+        });
+      }
+    }
   }
 
   async releaseExpiredReservations(): Promise<number> {

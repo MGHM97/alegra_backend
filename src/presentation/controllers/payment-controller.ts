@@ -11,6 +11,7 @@ import {
   ValidationError,
 } from '../../domain/errors/app-error.js';
 import { EmailService } from '../../application/services/email-service.js';
+import { confirmOrderPayment } from '../../application/services/order-confirmation-service.js';
 import {
   computeDiscount,
   findCouponByCode,
@@ -264,21 +265,33 @@ export async function webhookHandler(
           'Webhook payment_intent.succeeded sem pedido correspondente (órfão)',
         );
       } else if (order.status === 'RESERVED') {
-        await prisma.order.update({
-          where: { id: order.id },
-          data: { status: 'CONFIRMED', paymentStatus: 'SUCCEEDED' },
+        // Reivindica a transição RESERVED -> CONFIRMED e converte a reserva de
+        // estoque em venda efetiva (SALE) na mesma transação. O claim atômico
+        // garante que, mesmo com reentrega do webhook, o estoque nunca é
+        // decrementado duas vezes para o mesmo pedido.
+        const converted = await confirmOrderPayment({
+          orderId: order.id,
+          fromStatuses: ['RESERVED'],
+          toStatus: 'CONFIRMED',
+          paymentStatus: 'SUCCEEDED',
+          items: order.items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+          })),
         });
 
-        try {
-          await emailService.sendOrderConfirmed(
-            order.user.email,
-            order.user.name,
-            order.id,
-            order.totalAmount.toNumber(),
-            order.items.length,
-          );
-        } catch {
-          // Email failure should not break webhook response
+        if (converted) {
+          try {
+            await emailService.sendOrderConfirmed(
+              order.user.email,
+              order.user.name,
+              order.id,
+              order.totalAmount.toNumber(),
+              order.items.length,
+            );
+          } catch {
+            // Email failure should not break webhook response
+          }
         }
       } else {
         // Pedido existe mas não está RESERVED (ex.: já CONFIRMED por reentrega

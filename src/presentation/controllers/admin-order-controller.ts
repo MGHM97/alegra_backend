@@ -2,11 +2,18 @@ import type { Prisma } from '@prisma/client';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../../infra/database/prisma-client.js';
 import { successResponse, listResponse } from '../../shared/utils/response.js';
-import { NotFoundError, ValidationError } from '../../domain/errors/app-error.js';
+import {
+  NotFoundError,
+  ValidationError,
+  OrderStateConflictError,
+} from '../../domain/errors/app-error.js';
 import { EmailService } from '../../application/services/email-service.js';
 import { releaseCouponUsage } from '../../application/services/coupon-service.js';
+import { confirmOrderPayment } from '../../application/services/order-confirmation-service.js';
+import { InventoryService } from '../../application/services/inventory-service.js';
 
 const emailService = new EmailService();
+const inventoryService = new InventoryService();
 import {
   VALID_TRANSITIONS,
   type AdminOrderFiltersInput,
@@ -129,30 +136,57 @@ export async function updateOrderStatusHandler(
     updateData.deliveredAt = new Date();
   }
 
-  if (newStatus === 'CANCELLED') {
-    await prisma.$transaction(async (tx) => {
-      for (const item of order.items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { reservedStock: { decrement: item.quantity } },
-        });
+  if (newStatus === 'CONFIRMED') {
+    // Marcação manual de pagamento confirmado (ex.: PIX/boleto pago fora do
+    // fluxo Stripe). Reivindica a transição atomicamente e converte a
+    // reserva de estoque em venda efetiva (SALE) na mesma transação —
+    // mesmo caminho usado pelo webhook, para nunca decrementar o estoque
+    // duas vezes para o mesmo pedido.
+    const converted = await confirmOrderPayment({
+      orderId: id,
+      fromStatuses: [order.status],
+      toStatus: 'CONFIRMED',
+      items: order.items.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+      })),
+    });
 
-        await tx.inventoryLog.create({
-          data: {
-            productId: item.productId,
-            action: 'RESERVATION_RELEASE',
-            quantity: item.quantity,
-            reason: `Admin cancelled order ${order.id}`,
-          },
-        });
+    if (!converted) {
+      throw new OrderStateConflictError();
+    }
+  } else if (newStatus === 'CANCELLED') {
+    await prisma.$transaction(async (tx) => {
+      // Reivindica a transição atomicamente: se o pedido já saiu do status
+      // lido acima (ex.: cliente cancelou ou webhook confirmou em paralelo),
+      // count === 0 e abortamos antes de tocar no estoque — evitando
+      // decremento duplo de reservedStock (double-release).
+      const claim = await tx.order.updateMany({
+        where: { id, status: order.status },
+        data: updateData,
+      });
+
+      if (claim.count === 0) {
+        throw new OrderStateConflictError();
       }
+
+      // order.status é o status ANTES do claim. VALID_TRANSITIONS permite
+      // cancelar a partir de PENDING/RESERVED (pré-venda) OU de
+      // CONFIRMED/PROCESSING (pós-venda, quando commitSale já rodou). O
+      // ramo correto — liberar reserva vs. devolver ao estoque físico — é
+      // decidido dentro de releaseOrderStock a partir desse status.
+      await inventoryService.releaseOrderStock(
+        tx,
+        order.id,
+        order.items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+        order.status,
+        `Admin cancelled order ${order.id}`,
+      );
 
       // Release coupon usage if the order had one applied.
       if (order.couponId) {
         await releaseCouponUsage(tx, order.couponId);
       }
-
-      await tx.order.update({ where: { id }, data: updateData });
     });
   } else {
     await prisma.order.update({ where: { id }, data: updateData });

@@ -26,7 +26,11 @@ export async function buildApp() {
           ? { target: 'pino-pretty', options: { colorize: true } }
           : undefined,
     },
-    trustProxy: true,
+    // 1 hop confiável: apenas o proxy reverso imediatamente na frente da API.
+    // NUNCA usar `true` — isso confia em toda a cadeia de X-Forwarded-For
+    // enviada pelo cliente, permitindo forjar `request.ip` e anular o rate
+    // limiting por IP.
+    trustProxy: 1,
   });
 
   fastify.addContentTypeParser(
