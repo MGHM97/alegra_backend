@@ -9,6 +9,7 @@ import type {
   CreateReviewInput,
   ReviewRepository,
 } from '../../domain/repositories/review-repository.js';
+import { recalculateProductRatingAggregate } from '../../application/services/product-rating-service.js';
 
 const DEFAULT_ADMIN_LIMIT = 20;
 const MAX_ADMIN_LIMIT = 100;
@@ -49,21 +50,37 @@ export class PrismaReviewRepository implements ReviewRepository {
   }
 
   async create(data: CreateReviewInput): Promise<ReviewEntity> {
-    return prisma.review.create({
-      data: {
-        userId: data.userId,
-        productId: data.productId,
-        userName: data.userName,
-        rating: data.rating,
-        comment: data.comment,
-        photos: data.photos ?? [],
-        isVerifiedPurchase: data.isVerifiedPurchase ?? false,
-      },
+    // Cria a review e recalcula o agregado averageRating/reviewCount do
+    // produto na MESMA transação — ver product-rating-service.ts. Se o P2002
+    // de corrida (@@unique([userId, productId])) disparar aqui, a transação
+    // inteira faz rollback e o agregado nunca é tocado.
+    return prisma.$transaction(async (tx) => {
+      const review = await tx.review.create({
+        data: {
+          userId: data.userId,
+          productId: data.productId,
+          userName: data.userName,
+          rating: data.rating,
+          comment: data.comment,
+          photos: data.photos ?? [],
+          isVerifiedPurchase: data.isVerifiedPurchase ?? false,
+        },
+      });
+
+      await recalculateProductRatingAggregate(tx, data.productId);
+
+      return review;
     });
   }
 
   async delete(id: string): Promise<void> {
-    await prisma.review.delete({ where: { id } });
+    // Mesma lógica de create(): remoção e recálculo do agregado na mesma
+    // transação, para que averageRating/reviewCount nunca fiquem
+    // dessincronizados do conjunto real de reviews.
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.review.delete({ where: { id } });
+      await recalculateProductRatingAggregate(tx, existing.productId);
+    });
   }
 
   async listAdmin(filters: AdminReviewListFilters): Promise<AdminReviewListResult> {

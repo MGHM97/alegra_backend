@@ -82,6 +82,9 @@ export class PrismaProductRepository implements ProductRepository {
         maxInstallments: true,
         installmentPrice: true,
         isActive: true,
+        averageRating: true,
+        reviewCount: true,
+        soldCount: true,
       },
     });
 

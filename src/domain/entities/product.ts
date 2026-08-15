@@ -23,6 +23,11 @@ export interface ProductEntity {
   maxInstallments: number;
   installmentPrice: Decimal | null;
   videoUrl: string | null;
+  // Agregados denormalizados — ver comentário em prisma/schema.prisma.
+  // averageRating é null enquanto o produto não tiver nenhuma review.
+  averageRating: Decimal | null;
+  reviewCount: number;
+  soldCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,4 +48,7 @@ export interface ProductListItem {
   maxInstallments: number;
   installmentPrice: Decimal | null;
   isActive: boolean;
+  averageRating: Decimal | null;
+  reviewCount: number;
+  soldCount: number;
 }

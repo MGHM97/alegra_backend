@@ -9,7 +9,7 @@ import {
   UnauthorizedError,
 } from '../../domain/errors/app-error.js';
 import { userHasDeliveredPurchase } from '../../application/services/review-eligibility-service.js';
-import { cacheGet, cacheSet } from '../../infra/cache/cache-utils.js';
+import { cacheGet, cacheSet, cacheInvalidatePattern } from '../../infra/cache/cache-utils.js';
 import {
   invalidateProductReviewsCache,
   productReviewsBySlugCacheKey,
@@ -157,6 +157,10 @@ export async function createReviewHandler(
   // a review já foi persistida — o pior caso é a listagem cacheada ficar
   // desatualizada até o TTL expirar, nunca uma falha na criação.
   await invalidateProductReviewsCache(productId);
+  // O agregado averageRating/reviewCount do produto mudou (recalculado na
+  // mesma transação do create) — derruba também o cache de produto
+  // (listagem/detalhe), senão o card "★ 4.9" fica desatualizado até o TTL.
+  await cacheInvalidatePattern('products:*');
 
   void reply.status(201).send(successResponse(serializeReview(review)));
 }

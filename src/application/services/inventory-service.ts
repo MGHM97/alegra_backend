@@ -264,6 +264,10 @@ export class InventoryService {
         data: {
           stock: { decrement: item.quantity },
           reservedStock: { decrement: item.quantity },
+          // Agregado denormalizado para o card "★ 4.9 · +100 vendidos" —
+          // mesma transação Serializable que efetiva a venda, então nunca
+          // fica dessincronizado do estoque físico.
+          soldCount: { increment: item.quantity },
         },
       });
 
@@ -325,7 +329,13 @@ export class InventoryService {
       } else {
         await tx.product.update({
           where: { id: item.productId },
-          data: { stock: { increment: item.quantity } },
+          data: {
+            stock: { increment: item.quantity },
+            // Contrapartida do increment em commitSale: este ramo só roda
+            // pós-venda (commitSale já rodou para este pedido), então
+            // sempre existe um increment correspondente a desfazer aqui.
+            soldCount: { decrement: item.quantity },
+          },
         });
 
         await tx.inventoryLog.create({

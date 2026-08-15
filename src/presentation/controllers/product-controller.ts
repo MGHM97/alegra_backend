@@ -31,6 +31,11 @@ export async function listProductsHandler(
     originalPrice: item.originalPrice ? Number(item.originalPrice) : null,
     installmentPrice: item.installmentPrice ? Number(item.installmentPrice) : null,
     availableStock: item.stock - item.reservedStock,
+    // ★ 4.9 · +100 vendidos (card estilo Mercado Livre) — agregados
+    // denormalizados em Product, sem N+1 aqui.
+    averageRating: item.averageRating ? Number(item.averageRating) : null,
+    reviewCount: item.reviewCount,
+    soldCount: item.soldCount,
   }));
 
   const response = listResponse(serialized, result.cursor, result.hasMore);
@@ -65,6 +70,9 @@ export async function getProductHandler(
     weight: Number(product.weight),
     installmentPrice: product.installmentPrice ? Number(product.installmentPrice) : null,
     availableStock: product.stock - product.reservedStock,
+    averageRating: product.averageRating ? Number(product.averageRating) : null,
+    reviewCount: product.reviewCount,
+    soldCount: product.soldCount,
   };
 
   const response = successResponse(serialized);
@@ -90,6 +98,9 @@ export async function getProductByIdHandler(
     weight: Number(product.weight),
     installmentPrice: product.installmentPrice ? Number(product.installmentPrice) : null,
     availableStock: product.stock - product.reservedStock,
+    averageRating: product.averageRating ? Number(product.averageRating) : null,
+    reviewCount: product.reviewCount,
+    soldCount: product.soldCount,
   };
 
   void reply.status(200).send(successResponse(serialized));

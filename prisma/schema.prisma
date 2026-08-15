@@ -178,6 +178,20 @@ model Product {
   maxInstallments  Int      @default(1) @map("max_installments")
   installmentPrice Decimal? @map("installment_price") @db.Decimal(10, 2)
   videoUrl         String?  @map("video_url")
+  // Agregados denormalizados para o card estilo Mercado Livre ("★ 4.9 ·
+  // +100 vendidos") sem N+1 em GET /v1/products. Nunca escritos
+  // diretamente por input de admin/cliente — sempre recalculados a partir
+  // da fonte de verdade:
+  // - averageRating/reviewCount: recalculados via aggregate() sobre Review
+  //   dentro da MESMA transação que cria/remove uma review (ver
+  //   product-rating-service.ts). null quando reviewCount == 0.
+  // - soldCount: incrementado em InventoryService.commitSale (venda
+  //   confirmada) e decrementado em InventoryService.releaseOrderStock no
+  //   ramo pós-venda (RESTOCK) — mesma transação Serializable que já move
+  //   o estoque físico, garantindo consistência com o ciclo de estoque.
+  averageRating    Decimal? @map("average_rating") @db.Decimal(2, 1)
+  reviewCount      Int      @default(0) @map("review_count")
+  soldCount        Int      @default(0) @map("sold_count")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 

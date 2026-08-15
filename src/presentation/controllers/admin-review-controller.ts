@@ -5,6 +5,7 @@ import { NotFoundError } from '../../domain/errors/app-error.js';
 import type { AdminListReviewsQuery } from '../schemas/review-schemas.js';
 import type { ReviewWithRelations } from '../../domain/entities/review.js';
 import { invalidateProductReviewsCache } from '../../application/services/review-cache-service.js';
+import { cacheInvalidatePattern } from '../../infra/cache/cache-utils.js';
 
 const reviewRepository = new PrismaReviewRepository();
 
@@ -72,5 +73,8 @@ export async function deleteAdminReviewHandler(
   }
   await reviewRepository.delete(request.params.id);
   await invalidateProductReviewsCache(existing.productId);
+  // averageRating/reviewCount do produto mudou (recalculado na mesma
+  // transação do delete) — derruba o cache de produto também.
+  await cacheInvalidatePattern('products:*');
   void reply.status(204).send();
 }
