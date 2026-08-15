@@ -1,6 +1,5 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { pipeline } from 'node:stream/promises';
 import { randomUUID } from 'node:crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { ValidationError } from '../../domain/errors/app-error.js';
@@ -28,6 +27,19 @@ const MIME_TO_EXT: Record<string, string> = {
 
 const MAX_FILES = 5;
 
+/**
+ * `@fastify/multipart` lança `FST_REQ_FILE_TOO_LARGE` de dentro de
+ * `part.toBuffer()` quando o arquivo excede `limits.fileSize` (comportamento
+ * padrão com `throwFileSizeLimit: true`, o default do plugin).
+ */
+function isFileTooLargeError(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    'code' in err &&
+    (err as { code: unknown }).code === 'FST_REQ_FILE_TOO_LARGE'
+  );
+}
+
 function getUploadsDir(): string {
   // __dirname (CJS/tsx): src/presentation/controllers/ → ../../.. → raiz do projeto
   // Em produção (dist/): dist/presentation/controllers/ → ../../.. → raiz do projeto
@@ -49,6 +61,10 @@ export async function uploadProductImagesHandler(
 
   const urls: string[] = [];
   const uploadsDir = getUploadsDir();
+
+  // file-type é ESM-only; import dinâmico funciona mesmo com o projeto
+  // compilando para CJS (ver memória do agente sobre import.meta/Node16).
+  const { fileTypeFromBuffer } = await import('file-type');
 
   // Garante que o diretório existe em runtime
   await fs.promises.mkdir(uploadsDir, { recursive: true });
@@ -76,24 +92,44 @@ export async function uploadProductImagesHandler(
       throw new ValidationError('Formato de imagem não suportado.');
     }
 
+    let buffer: Buffer;
+    try {
+      buffer = await part.toBuffer();
+    } catch (err: unknown) {
+      if (isFileTooLargeError(err)) {
+        throw new ValidationError('Cada imagem deve ter no máximo 5 MB.');
+      }
+      request.log.error({ err }, 'Falha ao ler upload de imagem.');
+      throw new ValidationError('Erro ao processar a imagem. Tente novamente.');
+    }
+
+    // Defesa extra: cobre o caso de `throwFileSizeLimit` vir desabilitado.
+    if (part.file.truncated) {
+      throw new ValidationError('Cada imagem deve ter no máximo 5 MB.');
+    }
+
+    // Valida os magic bytes reais do arquivo: `mimetype` e a extensão vêm
+    // do cliente e podem ser forjados (ex.: um HTML malicioso renomeado
+    // para .jpg com Content-Type falso). Rejeita se a assinatura binária
+    // não for reconhecida, não estiver entre os tipos aceitos, ou divergir
+    // do Content-Type declarado.
+    const detected = await fileTypeFromBuffer(buffer);
+    if (!detected || !ACCEPTED_MIME_TYPES.has(detected.mime) || detected.mime !== mimetype) {
+      throw new ValidationError(
+        'Arquivo inválido: o conteúdo não corresponde a uma imagem suportada.',
+      );
+    }
+
     const ext = MIME_TO_EXT[mimetype] ?? originalExt;
     const filename = `${randomUUID()}${ext}`;
     const filePath = path.join(uploadsDir, filename);
 
     try {
-      const writeStream = fs.createWriteStream(filePath);
-      await pipeline(part.file, writeStream);
+      await fs.promises.writeFile(filePath, buffer);
     } catch (err: unknown) {
-      // Remove arquivo parcial em caso de falha
       await fs.promises.unlink(filePath).catch(() => undefined);
       request.log.error({ err }, 'Falha ao salvar imagem no disco.');
       throw new ValidationError('Erro ao salvar a imagem. Tente novamente.');
-    }
-
-    // Verifica se o @fastify/multipart rejeitou o arquivo por tamanho
-    if (part.file.truncated) {
-      await fs.promises.unlink(filePath).catch(() => undefined);
-      throw new ValidationError('Cada imagem deve ter no máximo 5 MB.');
     }
 
     const baseUrl =

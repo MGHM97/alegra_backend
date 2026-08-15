@@ -3,6 +3,10 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../../infra/database/prisma-client.js';
 import { listResponse, successResponse } from '../../shared/utils/response.js';
 import { NotFoundError } from '../../domain/errors/app-error.js';
+import {
+  clearUserAccessRevocation,
+  revokeUserAccess,
+} from '../../infra/cache/auth-revocation.js';
 
 export async function listAdminUsersHandler(
   request: FastifyRequest<{
@@ -87,6 +91,15 @@ export async function toggleUserStatusHandler(
       _count: { select: { orders: true } },
     },
   });
+
+  // Best-effort no Redis (ver `auth-revocation.ts`) — nunca falha a resposta
+  // desta rota. Desativar revoga qualquer access token já emitido de
+  // imediato; reativar limpa a revogação para o usuário voltar a autenticar.
+  if (updated.isActive) {
+    await clearUserAccessRevocation(updated.id);
+  } else {
+    await revokeUserAccess(updated.id);
+  }
 
   void reply.status(200).send(successResponse({
     id: updated.id,

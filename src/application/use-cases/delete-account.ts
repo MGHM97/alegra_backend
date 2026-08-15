@@ -7,6 +7,7 @@ import {
   UnauthorizedError,
 } from '../../domain/errors/app-error.js';
 import { logger } from '../../shared/utils/logger.js';
+import { revokeUserAccess } from '../../infra/cache/auth-revocation.js';
 
 /**
  * Use case: Soft Delete Anônimo de Conta (Direito ao Esquecimento — LGPD).
@@ -102,6 +103,11 @@ export class DeleteAccountUseCase {
         },
       });
     });
+
+    // Revoga imediatamente qualquer access token já emitido para esta conta
+    // (ver `auth-revocation.ts`) — best-effort, fora da transação Postgres,
+    // pois o Redis não participa do ACID daquela transação.
+    await revokeUserAccess(userId);
 
     // Log de auditoria LGPD — mantemos o userId original para rastreio
     // de conformidade (ex.: em caso de auditoria do encarregado de dados)

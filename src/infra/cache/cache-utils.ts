@@ -23,6 +23,32 @@ export async function cacheSet(key: string, value: unknown, ttlSeconds: number):
   }
 }
 
+export async function cacheDelete(key: string): Promise<void> {
+  try {
+    const redis = await getRedisClient();
+    await redis.del(key);
+  } catch (err) {
+    logger.warn({ err, key }, 'Falha ao remover chave do cache — Redis indisponível');
+  }
+}
+
+/**
+ * Checagem best-effort de existência de chave. Usada em caminhos de
+ * segurança (ex.: revogação de sessão no authGuard) onde uma falha de Redis
+ * NUNCA pode bloquear a requisição — por isso falha aberta (retorna `false`)
+ * e apenas registra o incidente, na mesma filosofia do rate limiter de login.
+ */
+export async function cacheExists(key: string): Promise<boolean> {
+  try {
+    const redis = await getRedisClient();
+    const exists = await redis.exists(key);
+    return exists === 1;
+  } catch (err) {
+    logger.warn({ err, key }, 'Falha ao checar chave no cache — Redis indisponível, liberando');
+    return false;
+  }
+}
+
 export async function cacheInvalidatePattern(pattern: string): Promise<void> {
   try {
     const redis = await getRedisClient();

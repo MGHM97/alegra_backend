@@ -6,6 +6,7 @@ import { authGuard, requireRole } from '../../shared/middlewares/auth-guard.js';
 
 export async function inventoryRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/:productId', {
+    preHandler: [authGuard, requireRole('ADMIN')],
     handler: fetchStockHandler,
   });
 

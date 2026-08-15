@@ -1,6 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { verifyAccessToken, type AccessTokenPayload } from '../utils/jwt.js';
 import { ForbiddenError, UnauthorizedError } from '../../domain/errors/app-error.js';
+import { isUserAccessRevoked } from '../../infra/cache/auth-revocation.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -19,7 +20,17 @@ export async function authGuard(
   }
 
   const token = authHeader.slice(7);
-  request.currentUser = verifyAccessToken(token);
+  const payload = verifyAccessToken(token);
+
+  // Revogação imediata: usuário desativado/excluído não pode continuar
+  // usando um access token já emitido até ele expirar sozinho. Falha aberta
+  // se o Redis estiver fora do ar (ver `isUserAccessRevoked`) — disponibilidade
+  // da API não pode depender do cache de revogação.
+  if (await isUserAccessRevoked(payload.sub)) {
+    throw new UnauthorizedError('Session revoked');
+  }
+
+  request.currentUser = payload;
 }
 
 export function requireRole(...roles: Array<'CUSTOMER' | 'ADMIN'>) {
