@@ -1,4 +1,4 @@
-import type { ProductEntity, ProductListItem } from '../entities/product.js';
+import type { ProductEntity, ProductListItem, ProductSort } from '../entities/product.js';
 
 export interface ProductFilters {
   category?: string;
@@ -7,6 +7,7 @@ export interface ProductFilters {
   maxPrice?: number;
   isActive?: boolean;
   badges?: string[];
+  sort?: ProductSort;
 }
 
 export interface CursorPaginationParams {

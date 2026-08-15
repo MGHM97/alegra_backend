@@ -2,3 +2,4 @@
 - [Bumps de dependência com CVE](dependency-bumps.md) — fluxo de investigação/aplicação e a trava de `@types/nodemailer` em 8.x
 - [Padrão de paginação por cursor](pagination-pattern.md) — replicar o padrão admin, mas com checagem de posse do cursor em recursos escopados por usuário
 - [Docker (Dockerfile + serviço api)](docker-deployment.md) — stages, gotchas de Alpine/musl (openssl, bcrypt), volumes e rede do compose
+- [Sort + cursor de GET /v1/products](product-sort-cursor.md) — coluna GENERATED STORED para discount, cursor {v,v2,id}, cursor legado uuid força newest

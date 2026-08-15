@@ -1,5 +1,19 @@
 import type { Decimal } from '@prisma/client/runtime/library';
 
+// Server-side sort for GET /v1/products (Mercado Livre-style listing).
+// 'relevance' has no ranking signal of its own today (no full-text-search
+// rank column) — it always resolves to the same tuple as 'newest'
+// (createdAt desc), including when `search` is set, matching the previous
+// (pre-sort) fixed ordering exactly.
+export type ProductSort =
+  | 'relevance'
+  | 'price_asc'
+  | 'price_desc'
+  | 'newest'
+  | 'best_sellers'
+  | 'top_rated'
+  | 'discount';
+
 export interface ProductEntity {
   id: string;
   name: string;

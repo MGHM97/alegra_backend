@@ -192,6 +192,17 @@ model Product {
   averageRating    Decimal? @map("average_rating") @db.Decimal(2, 1)
   reviewCount      Int      @default(0) @map("review_count")
   soldCount        Int      @default(0) @map("sold_count")
+  // Coluna GERADA pelo Postgres (GENERATED ALWAYS AS ... STORED, ver
+  // migration add_product_sort_indexes) — não é um campo Prisma DSL comum,
+  // o DSL não expressa a cláusula GENERATED, então ela foi escrita à mão na
+  // migration, seguindo o mesmo precedente do INCLUDE em
+  // orders_status_created_at_idx (ver docs/migrations.md). Fração de
+  // desconto (0 a 1) = (original_price - price) / original_price quando
+  // original_price existe e é maior que price; 0 caso contrário — nunca
+  // null, então não precisa de NULLS LAST no sort `discount`. NUNCA
+  // escrever este campo via Prisma (create/update) — o Postgres rejeita
+  // INSERT/UPDATE explícito em coluna GENERATED ALWAYS.
+  discountPercent  Decimal? @map("discount_percent") @db.Decimal(5, 4)
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
@@ -208,6 +219,14 @@ model Product {
   // Scan via GIN trigram ~2-3ms. Requer a extensão pg_trgm (ver datasource).
   @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_name_trgm_idx")
   @@index([description(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_description_trgm_idx")
+  // Sorts server-side de GET /v1/products (ver product-repository, sort
+  // param) — cada um cobre a coluna primária de ordenação + id (tiebreak do
+  // keyset cursor), permitindo Index Scan em vez de Seq Scan + sort em
+  // memória à medida que o catálogo cresce.
+  @@index([soldCount(sort: Desc), id])
+  @@index([averageRating(sort: Desc), reviewCount(sort: Desc)])
+  @@index([price, id])
+  @@index([discountPercent(sort: Desc), id])
   @@map("products")
 }
 

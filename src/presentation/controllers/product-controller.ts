@@ -16,6 +16,9 @@ export async function listProductsHandler(
 ): Promise<void> {
   const { cursor, limit, ...filters } = request.query;
 
+  // `sort` stays inside `filters` (only cursor/limit are pulled out above),
+  // so it's already part of the cache key below — a stale `price_asc` page
+  // can never be served back for a `best_sellers` request.
   const cacheKey = `products:list:${JSON.stringify({ ...filters, cursor, limit })}`;
   const cached = await cacheGet<unknown>(cacheKey);
   if (cached) {
