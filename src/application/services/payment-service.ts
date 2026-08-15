@@ -1,8 +1,6 @@
-import Stripe from 'stripe';
 import { env } from '../../infra/config/env.js';
+import { stripe } from '../../infra/config/stripe.js';
 import type { PaymentMethodKey } from '../../presentation/schemas/payment-schemas.js';
-
-const stripe = new Stripe(env.STRIPE_SECRET_KEY);
 
 export interface CreatePaymentIntentInput {
   amountInCents: number;

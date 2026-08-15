@@ -20,6 +20,16 @@ export class PrismaSavedCardRepository implements SavedCardRepository {
     return cards as SavedCardEntity[];
   }
 
+  async findByUserIdAndStripePaymentMethodId(
+    userId: string,
+    stripePaymentMethodId: string,
+  ): Promise<SavedCardEntity | null> {
+    const card = await prisma.savedCard.findUnique({
+      where: { userId_stripePaymentMethodId: { userId, stripePaymentMethodId } },
+    });
+    return card as SavedCardEntity | null;
+  }
+
   async create(data: CreateSavedCardInput): Promise<SavedCardEntity> {
     const card = await prisma.$transaction(async (tx) => {
       if (data.isDefault) {
@@ -32,6 +42,8 @@ export class PrismaSavedCardRepository implements SavedCardRepository {
       return tx.savedCard.create({
         data: {
           userId: data.userId,
+          stripePaymentMethodId: data.stripePaymentMethodId,
+          stripeCustomerId: data.stripeCustomerId,
           lastFourDigits: data.lastFourDigits,
           brand: data.brand,
           holderName: data.holderName,

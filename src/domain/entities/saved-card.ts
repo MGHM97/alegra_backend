@@ -13,6 +13,9 @@ export interface SavedCardEntity {
   holderDocument: string | null;
   issuer: string | null;
   isDefault: boolean;
+  /** Preenchidos via Stripe SetupIntent (SavedCardService) — null apenas em cartões legados nunca migrados. */
+  stripePaymentMethodId: string | null;
+  stripeCustomerId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
