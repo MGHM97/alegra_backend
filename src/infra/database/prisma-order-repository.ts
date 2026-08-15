@@ -17,7 +17,16 @@ import type { Coupon } from '../../domain/entities/coupon.js';
 import { computeInstallmentFee } from '../../shared/utils/installments.js';
 import { cacheInvalidatePattern } from '../../infra/cache/cache-utils.js';
 
-const STOCK_RESERVATION_MINUTES = 15;
+// Default/fallback TTL quando o pedido não informa pixExpiresAt/boletoExpiresAt
+// explícito (ver uso abaixo). Igualado aos 30min do Pix
+// (PIX_EXPIRES_AFTER_SECONDS em payment-service.ts) porque pixExpiresAt é
+// OPCIONAL no schema de criação de pedido (order-schemas.ts) — um cliente
+// que omitir esse campo para um pedido Pix cairia neste fallback, e um
+// fallback menor que a janela real do Pix liberaria o estoque reservado
+// antes de o cliente conseguir pagar (oversell). 15min continuava seguro só
+// para cartão (cobrança imediata), mas o valor é compartilhado, então
+// subimos o piso comum para 30min.
+const STOCK_RESERVATION_MINUTES = 30;
 
 /**
  * Verifica se um PrismaClientKnownRequestError é uma violação de unique
@@ -148,7 +157,7 @@ export class PrismaOrderRepository implements OrderRepository {
     // A janela de reserva DEVE cobrir o prazo de pagamento, senão o job de
     // cleanup libera o estoque enquanto o cliente ainda pode pagar (PIX 30min,
     // boleto dias) — gerando oversell e pedidos "pagos porém cancelados".
-    // Cartão é cobrado na hora, então 15min basta.
+    // Cartão é cobrado na hora, então o fallback de 30min é folgado de sobra.
     let reservedUntil = new Date(Date.now() + STOCK_RESERVATION_MINUTES * 60 * 1000);
     if (data.paymentMethod === 'PIX' && data.pixExpiresAt) {
       reservedUntil = new Date(data.pixExpiresAt);

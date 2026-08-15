@@ -28,6 +28,15 @@ const paymentItemSchema = z.object({
 export const paymentMethodSchema = z.enum(['pix', 'card', 'saved_card']);
 export type PaymentMethodKey = z.infer<typeof paymentMethodSchema>;
 
+/**
+ * Teto documentado do Pix na Stripe: pedidos precisam estar entre
+ * R$ 0,50 e R$ 3.000,00 (valores fora dessa faixa são rejeitados pela
+ * Stripe na criação do PaymentIntent). Validamos isso ANTES de chamar a
+ * Stripe para devolver uma mensagem em pt-BR clara ao cliente.
+ */
+export const PIX_MIN_AMOUNT_CENTS = 50;
+export const PIX_MAX_AMOUNT_CENTS = 300_000;
+
 export const createPaymentIntentSchema = z
   .object({
     items: z

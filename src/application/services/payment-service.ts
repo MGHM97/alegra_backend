@@ -12,7 +12,25 @@ export interface CreatePaymentIntentInput {
   /** Customer id from Stripe — required when reusing a saved payment method. */
   stripeCustomerId?: string;
   installments?: number;
+  /**
+   * Chave de idempotência repassada à Stripe (2º argumento de
+   * `paymentIntents.create`). Evita criar dois PaymentIntents/cobranças caso
+   * a requisição seja reenviada (retry de rede, duplo clique) com o mesmo
+   * conteúdo. Derivada pelo controller — ver `createPaymentIntentHandler`.
+   */
+  idempotencyKey?: string;
 }
+
+/** Nome do lojista exibido na fatura do cartão do cliente (≤ 22 caracteres, sem <>'"*). */
+const STATEMENT_DESCRIPTOR_SUFFIX = 'ALEGRA FESTAS';
+
+/**
+ * Tempo de validade do QR Code Pix na Stripe. Precisa ser <= ao TTL da
+ * reserva de estoque (ver STOCK_RESERVATION_MINUTES em
+ * prisma-order-repository.ts) para que o estoque não seja liberado antes de
+ * o cliente conseguir pagar o Pix.
+ */
+const PIX_EXPIRES_AFTER_SECONDS = 1800;
 
 export interface PixData {
   qrCodeImage: string;
@@ -42,18 +60,27 @@ export class PaymentService {
    * `interest_free` plans up to 12x for cards on supported issuers.
    */
   async createPaymentIntent(input: CreatePaymentIntentInput): Promise<PaymentIntentResult> {
-    const { paymentMethod, amountInCents, currency, metadata } = input;
+    const { paymentMethod, amountInCents, currency, metadata, idempotencyKey } = input;
     const lowerCurrency = currency.toLowerCase();
+    const requestOptions: Parameters<typeof stripe.paymentIntents.create>[1] = {
+      idempotencyKey,
+    };
 
     if (paymentMethod === 'pix') {
-      const intent = await stripe.paymentIntents.create({
-        amount: amountInCents,
-        currency: lowerCurrency,
-        payment_method_types: ['pix'],
-        payment_method_data: { type: 'pix' },
-        confirm: true,
-        metadata,
-      });
+      const intent = await stripe.paymentIntents.create(
+        {
+          amount: amountInCents,
+          currency: lowerCurrency,
+          payment_method_types: ['pix'],
+          payment_method_data: { type: 'pix' },
+          payment_method_options: {
+            pix: { expires_after_seconds: PIX_EXPIRES_AFTER_SECONDS },
+          },
+          confirm: true,
+          metadata,
+        },
+        requestOptions,
+      );
 
       return this.toResult(intent, 'pix');
     }
@@ -70,6 +97,7 @@ export class PaymentService {
         payment_method: input.stripePaymentMethodId,
         confirm: true,
         off_session: true,
+        statement_descriptor_suffix: STATEMENT_DESCRIPTOR_SUFFIX,
         metadata,
       };
 
@@ -88,7 +116,7 @@ export class PaymentService {
         };
       }
 
-      const intent = await stripe.paymentIntents.create(params);
+      const intent = await stripe.paymentIntents.create(params, requestOptions);
       return this.toResult(intent, 'saved_card');
     }
 
@@ -97,6 +125,7 @@ export class PaymentService {
       amount: amountInCents,
       currency: lowerCurrency,
       payment_method_types: ['card'],
+      statement_descriptor_suffix: STATEMENT_DESCRIPTOR_SUFFIX,
       metadata,
     };
 
@@ -110,7 +139,7 @@ export class PaymentService {
       };
     }
 
-    const intent = await stripe.paymentIntents.create(cardParams);
+    const intent = await stripe.paymentIntents.create(cardParams, requestOptions);
     return this.toResult(intent, 'card');
   }
 

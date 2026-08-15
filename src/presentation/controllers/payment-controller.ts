@@ -1,4 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import crypto from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../infra/database/prisma-client.js';
 import { PaymentService } from '../../application/services/payment-service.js';
@@ -18,7 +19,36 @@ import {
   assertCouponUsable,
 } from '../../application/services/coupon-service.js';
 import type { CreatePaymentIntentInput } from '../schemas/payment-schemas.js';
+import { PIX_MAX_AMOUNT_CENTS, PIX_MIN_AMOUNT_CENTS } from '../schemas/payment-schemas.js';
 import { computeChargeableTotal } from '../../shared/utils/installments.js';
+
+/**
+ * Deriva uma chave de idempotência determinística para
+ * `stripe.paymentIntents.create` a partir do conteúdo do pedido: chamadas
+ * repetidas com o mesmo usuário e o mesmo conteúdo (retry de rede, duplo
+ * clique) reusam o mesmo PaymentIntent na Stripe em vez de criar cobranças
+ * duplicadas. Itens são ordenados por productId para que a mesma cesta
+ * enviada em ordens diferentes produza a mesma chave (JSON canônico).
+ */
+function deriveIdempotencyKey(
+  userId: string,
+  body: CreatePaymentIntentInput,
+): string {
+  const sortedItems = [...body.items]
+    .sort((a, b) => a.productId.localeCompare(b.productId))
+    .map((item) => ({ productId: item.productId, quantity: item.quantity }));
+
+  const canonicalPayload = JSON.stringify({
+    userId,
+    items: sortedItems,
+    shippingCost: body.shippingCost,
+    couponCode: body.couponCode ?? null,
+    paymentMethod: body.paymentMethod,
+    savedCardId: body.savedCardId ?? null,
+  });
+
+  return crypto.createHash('sha256').update(canonicalPayload).digest('hex');
+}
 
 const paymentService = new PaymentService();
 const emailService = new EmailService();
@@ -106,6 +136,18 @@ export async function createPaymentIntentHandler(
     throw new ValidationError('O valor mínimo do pedido é R$ 0,50');
   }
 
+  // Teto documentado do Pix na Stripe (ver PIX_MAX_AMOUNT_CENTS em
+  // payment-schemas.ts): validado ANTES de chamar a Stripe para devolver
+  // uma mensagem clara em pt-BR em vez do erro genérico da Stripe.
+  if (
+    paymentMethod === 'pix' &&
+    (amountInCents > PIX_MAX_AMOUNT_CENTS || amountInCents < PIX_MIN_AMOUNT_CENTS)
+  ) {
+    throw new ValidationError(
+      'PIX está disponível para pedidos entre R$ 0,50 e R$ 3.000,00. Para valores maiores, use cartão.',
+    );
+  }
+
   // Saved-card ownership validation — Zero-Trust. The frontend sends only
   // the SavedCard.id; we resolve it against the authenticated userId before
   // passing the Stripe payment_method id to the PaymentService.
@@ -170,11 +212,21 @@ export async function createPaymentIntentHandler(
     metadata.installments = String(installments);
   }
 
+  // Header do cliente tem prioridade (ele pode reusar a mesma chave em
+  // retries que o próprio cliente controla); na ausência dele, derivamos
+  // deterministicamente do conteúdo do pedido.
+  const headerIdempotencyKey = request.headers['x-idempotency-key'];
+  const idempotencyKey =
+    typeof headerIdempotencyKey === 'string' && headerIdempotencyKey.trim().length > 0
+      ? headerIdempotencyKey
+      : deriveIdempotencyKey(currentUser.sub, request.body);
+
   const result = await paymentService.createPaymentIntent({
     amountInCents,
     currency,
     metadata,
     paymentMethod,
+    idempotencyKey,
     ...(stripePaymentMethodId ? { stripePaymentMethodId } : {}),
     ...(stripeCustomerId ? { stripeCustomerId } : {}),
     ...(installments ? { installments } : {}),
