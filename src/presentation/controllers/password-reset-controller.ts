@@ -8,6 +8,7 @@ import { successResponse } from '../../shared/utils/response.js';
 import { NotFoundError, ValidationError } from '../../domain/errors/app-error.js';
 import type { ForgotPasswordInput, ResetPasswordInput } from '../schemas/password-reset-schemas.js';
 import { EmailService } from '../../application/services/email-service.js';
+import { env } from '../../infra/config/env.js';
 
 const userRepository = new PrismaUserRepository();
 const emailService = new EmailService();
@@ -46,7 +47,10 @@ export async function forgotPasswordHandler(
     },
   });
 
-  const resetUrl = `${process.env.CORS_ORIGIN ?? 'http://localhost:5173'}/reset-password?token=${plainToken}`;
+  // CORS_ORIGIN pode conter múltiplas origens separadas por vírgula; a
+  // primeira é a origem canônica do frontend usada para montar o link.
+  const frontendOrigin = (env.CORS_ORIGIN.split(',')[0] ?? env.CORS_ORIGIN).trim();
+  const resetUrl = `${frontendOrigin}/reset-password?token=${plainToken}`;
 
   await emailService.sendPasswordReset(email, user.name, resetUrl);
 

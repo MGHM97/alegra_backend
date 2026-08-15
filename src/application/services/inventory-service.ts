@@ -1,9 +1,10 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { prisma } from '../../infra/database/prisma-client.js';
-import { NotFoundError, InsufficientStockError } from '../../domain/errors/app-error.js';
+import { NotFoundError, InsufficientStockError, ConflictError } from '../../domain/errors/app-error.js';
 import type { InventorySyncInput } from '../../presentation/schemas/inventory-schemas.js';
 import type { OrderStatus } from '../../domain/entities/order.js';
 import { releaseCouponUsage } from './coupon-service.js';
+import { cacheInvalidatePattern } from '../../infra/cache/cache-utils.js';
 
 type TransactionClient = Omit<
   PrismaClient,
@@ -125,6 +126,59 @@ export class InventoryService {
     });
 
     return result;
+  }
+
+  /**
+   * Ajusta o estoque físico de um produto para um valor absoluto (não um
+   * delta), usado pela edição de produto no admin. Deve ser chamado dentro
+   * da MESMA transação que persiste os demais campos do produto, para que a
+   * checagem de `reservedStock` e a escrita do InventoryLog fiquem
+   * atômicas com a atualização.
+   *
+   * Estoque nunca pode ficar abaixo da quantidade já reservada (pedidos
+   * PENDING/RESERVED contam com aquele estoque) — reduzir abaixo disso
+   * quebraria a garantia de "stock nunca fica negativo" na hora de
+   * confirmar essas reservas.
+   */
+  async adjustStock(
+    tx: TransactionClient,
+    productId: string,
+    newStock: number,
+    reason: string,
+  ): Promise<void> {
+    const product = await tx.product.findUnique({
+      where: { id: productId },
+      select: { stock: true, reservedStock: true },
+    });
+
+    if (!product) {
+      throw new NotFoundError('Product');
+    }
+
+    if (newStock < product.reservedStock) {
+      throw new ConflictError(
+        `Estoque não pode ser menor que a quantidade reservada (${product.reservedStock}).`,
+      );
+    }
+
+    if (newStock === product.stock) {
+      return;
+    }
+
+    await tx.product.update({
+      where: { id: productId },
+      data: { stock: newStock },
+    });
+
+    await tx.inventoryLog.create({
+      data: {
+        productId,
+        action: 'ADJUSTMENT',
+        quantity: Math.abs(newStock - product.stock),
+        reason,
+        metadata: { previousStock: product.stock, newStock },
+      },
+    });
   }
 
   async syncInventory(input: InventorySyncInput): Promise<SyncResult> {
@@ -329,6 +383,13 @@ export class InventoryService {
       });
 
       released++;
+    }
+
+    if (released > 0) {
+      // Fora de cada transação por pedido e best-effort (Redis não é
+      // transacional com o Postgres): uma invalidação por execução do job
+      // basta, mesmo liberando várias reservas expiradas de uma vez.
+      await cacheInvalidatePattern('products:*');
     }
 
     return released;

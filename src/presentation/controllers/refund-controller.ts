@@ -9,6 +9,7 @@ import {
 } from '../../domain/errors/app-error.js';
 import { releaseCouponUsage } from '../../application/services/coupon-service.js';
 import { InventoryService } from '../../application/services/inventory-service.js';
+import { cacheInvalidatePattern } from '../../infra/cache/cache-utils.js';
 
 const paymentService = new PaymentService();
 const inventoryService = new InventoryService();
@@ -100,6 +101,10 @@ export async function refundOrderHandler(
       await releaseCouponUsage(tx, order.couponId);
     }
   });
+
+  // Fora da transação e best-effort (Redis não é transacional com o
+  // Postgres): o estoque já foi devolvido no banco quando chegamos aqui.
+  await cacheInvalidatePattern('products:*');
 
   void reply.status(200).send(
     successResponse({

@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from './prisma-client.js';
 import type { ProductEntity, ProductListItem } from '../../domain/entities/product.js';
 import type {
@@ -9,6 +9,9 @@ import type {
   ProductRepository,
   UpdateProductInput,
 } from '../../domain/repositories/product-repository.js';
+import { InventoryService } from '../../application/services/inventory-service.js';
+
+const inventoryService = new InventoryService();
 
 export class PrismaProductRepository implements ProductRepository {
   async findById(id: string): Promise<ProductEntity | null> {
@@ -144,13 +147,34 @@ export class PrismaProductRepository implements ProductRepository {
     if (data.thumbnailUrl !== undefined) updateData.thumbnailUrl = data.thumbnailUrl;
     if (data.badges !== undefined) updateData.badges = data.badges;
     if (data.specifications !== undefined) updateData.specifications = data.specifications as Prisma.InputJsonValue;
-    if (data.stock !== undefined) updateData.stock = data.stock;
     if (data.sku !== undefined) updateData.sku = data.sku;
     if (data.weight !== undefined) updateData.weight = data.weight;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
     if (data.maxInstallments !== undefined) updateData.maxInstallments = data.maxInstallments;
     if (data.installmentPrice !== undefined) updateData.installmentPrice = data.installmentPrice;
     if (data.videoUrl !== undefined) updateData.videoUrl = data.videoUrl;
+
+    // stock é tratado à parte: precisa validar contra reservedStock e gravar
+    // InventoryLog na MESMA transação que aplica os demais campos, para que
+    // a edição de produto nunca deixe o estoque abaixo do que já está
+    // reservado por pedidos PENDING/RESERVED.
+    if (data.stock !== undefined) {
+      const stock = data.stock;
+      const product = await prisma.$transaction(
+        async (tx) => {
+          await inventoryService.adjustStock(tx, id, stock, 'Ajuste manual via edição de produto');
+          return tx.product.update({
+            where: { id },
+            data: updateData,
+          });
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          timeout: 5000,
+        },
+      );
+      return product as unknown as ProductEntity;
+    }
 
     const product = await prisma.product.update({
       where: { id },

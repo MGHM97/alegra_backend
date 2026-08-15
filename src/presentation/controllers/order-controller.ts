@@ -13,6 +13,7 @@ import { prisma } from '../../infra/database/prisma-client.js';
 import { releaseCouponUsage } from '../../application/services/coupon-service.js';
 import { InventoryService } from '../../application/services/inventory-service.js';
 import type { PaymentMethod, PaymentStatus } from '../../domain/entities/order.js';
+import { cacheInvalidatePattern } from '../../infra/cache/cache-utils.js';
 
 const orderRepository = new PrismaOrderRepository();
 const inventoryService = new InventoryService();
@@ -455,6 +456,10 @@ export async function cancelOrderHandler(
       await releaseCouponUsage(tx, order.couponId);
     }
   });
+
+  // Fora da transação e best-effort (Redis não é transacional com o
+  // Postgres): a reserva já foi liberada no banco quando chegamos aqui.
+  await cacheInvalidatePattern('products:*');
 
   void reply.status(200).send(successResponse({ message: 'Pedido cancelado com sucesso.' }));
 }

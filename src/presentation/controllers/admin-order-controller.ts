@@ -11,6 +11,7 @@ import { EmailService } from '../../application/services/email-service.js';
 import { releaseCouponUsage } from '../../application/services/coupon-service.js';
 import { confirmOrderPayment } from '../../application/services/order-confirmation-service.js';
 import { InventoryService } from '../../application/services/inventory-service.js';
+import { cacheInvalidatePattern } from '../../infra/cache/cache-utils.js';
 
 const emailService = new EmailService();
 const inventoryService = new InventoryService();
@@ -188,6 +189,10 @@ export async function updateOrderStatusHandler(
         await releaseCouponUsage(tx, order.couponId);
       }
     });
+
+    // Fora da transação e best-effort (Redis não é transacional com o
+    // Postgres): o estoque já foi liberado no banco quando chegamos aqui.
+    await cacheInvalidatePattern('products:*');
   } else {
     await prisma.order.update({ where: { id }, data: updateData });
 

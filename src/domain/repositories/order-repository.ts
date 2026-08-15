@@ -8,7 +8,14 @@ import type {
 export interface CreateOrderItemInput {
   productId: string;
   quantity: number;
-  unitPrice: number;
+  /**
+   * Opcional: quando presente, é comparado ao preço atual do produto no
+   * banco e uma divergência lança PriceMismatchError. Quando ausente, o
+   * preço do banco é usado diretamente. Em ambos os casos, o preço
+   * efetivamente gravado no pedido é sempre o do banco — o cliente nunca é
+   * a fonte de verdade do preço.
+   */
+  unitPrice?: number;
 }
 
 export interface CreateOrderShippingAddress {

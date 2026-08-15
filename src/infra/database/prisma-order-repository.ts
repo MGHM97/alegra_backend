@@ -15,6 +15,7 @@ import {
 } from '../../application/services/coupon-service.js';
 import type { Coupon } from '../../domain/entities/coupon.js';
 import { computeInstallmentFee } from '../../shared/utils/installments.js';
+import { cacheInvalidatePattern } from '../../infra/cache/cache-utils.js';
 
 const STOCK_RESERVATION_MINUTES = 15;
 
@@ -159,6 +160,12 @@ export class PrismaOrderRepository implements OrderRepository {
     }
 
     const createOrderTx = () => prisma.$transaction(async (tx) => {
+      // Preço efetivamente cobrado por item — sempre o do banco, nunca o do
+      // cliente. Quando o cliente ainda envia unitPrice (compat), ele é só
+      // validado contra o banco (divergência = PriceMismatchError); o valor
+      // gravado no pedido vem sempre de `resolvedItems[i].unitPrice`.
+      const resolvedItems: Array<{ productId: string; quantity: number; unitPrice: number }> = [];
+
       for (const item of data.items) {
         const product = await tx.product.findUnique({
           where: { id: item.productId },
@@ -174,9 +181,11 @@ export class PrismaOrderRepository implements OrderRepository {
           throw new InsufficientStockError(item.productId, availableStock, item.quantity);
         }
 
-        if (product.price.toNumber() !== item.unitPrice) {
+        const dbPrice = product.price.toNumber();
+        if (item.unitPrice !== undefined && dbPrice !== item.unitPrice) {
           throw new PriceMismatchError();
         }
+        resolvedItems.push({ productId: item.productId, quantity: item.quantity, unitPrice: dbPrice });
 
         await tx.product.update({
           where: { id: item.productId },
@@ -193,7 +202,7 @@ export class PrismaOrderRepository implements OrderRepository {
         });
       }
 
-      const subtotal = data.items.reduce(
+      const subtotal = resolvedItems.reduce(
         (sum, item) => sum + item.unitPrice * item.quantity,
         0,
       );
@@ -266,7 +275,7 @@ export class PrismaOrderRepository implements OrderRepository {
           boletoBarcode: data.boletoBarcode,
           boletoExpiresAt: data.boletoExpiresAt,
           items: {
-            create: data.items.map((item) => ({
+            create: resolvedItems.map((item) => ({
               productId: item.productId,
               quantity: item.quantity,
               unitPrice: new Prisma.Decimal(item.unitPrice),
@@ -290,6 +299,11 @@ export class PrismaOrderRepository implements OrderRepository {
       for (let attempt = 1; ; attempt++) {
         try {
           const created = await createOrderTx();
+          // Best-effort, FORA da transação (Redis não é transacional com o
+          // Postgres): a reserva de estoque já commitou, então a listagem/
+          // detalhe de produto em cache pode estar mostrando availableStock
+          // desatualizado até isto rodar. Falha aqui nunca derruba o pedido.
+          await cacheInvalidatePattern('products:*');
           return created as OrderEntity;
         } catch (err) {
           const isSerializationFailure =

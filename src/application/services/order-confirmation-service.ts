@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../infra/database/prisma-client.js';
 import { InventoryService, type SaleOrderItem } from './inventory-service.js';
 import type { OrderStatus, PaymentStatus } from '../../domain/entities/order.js';
+import { cacheInvalidatePattern } from '../../infra/cache/cache-utils.js';
 
 const inventoryService = new InventoryService();
 
@@ -59,7 +60,15 @@ export async function confirmOrderPayment(
   // de pedidos (prisma-order-repository.ts).
   for (let attempt = 1; ; attempt++) {
     try {
-      return await run();
+      const committed = await run();
+      if (committed) {
+        // Fora da transação (Redis não participa do commit do Postgres) e
+        // best-effort: a venda já foi efetivada no banco; se o Redis estiver
+        // fora, o cache expira sozinho pelo TTL — não pode falhar a
+        // confirmação de pagamento por causa disso.
+        await cacheInvalidatePattern('products:*');
+      }
+      return committed;
     } catch (err) {
       const isSerializationFailure =
         err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2034';

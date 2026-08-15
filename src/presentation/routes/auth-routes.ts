@@ -81,7 +81,10 @@ async function loginRateLimiter(
     }
   } catch (err) {
     if (err instanceof AppError) throw err;
-    // Redis down — allow request to proceed
+    // Redis down — fail-open (disponibilidade > limite de tentativas), mas
+    // registra o incidente: sem isso, um Redis fora do ar libera login sem
+    // rate limit silenciosamente e ninguém percebe.
+    request.log.warn({ err }, 'Login rate limiter indisponível — requisição liberada sem limite');
   }
 }
 

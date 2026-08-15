@@ -6,10 +6,16 @@ import { paymentMethodSchema } from './payment-schemas.js';
 // which throws NotFoundError for unknown ids — that is the correct security
 // boundary. Decoupling this schema from a specific id format (uuid, cuid,
 // nanoid) lets the id strategy evolve without breaking checkout.
+// unitPrice é OPCIONAL: o backend sempre revalida (e usa) o preço vindo do
+// banco no momento do checkout (ver prisma-order-repository.ts), nunca
+// confiando no valor enviado pelo cliente. Quando o cliente ainda envia
+// unitPrice (compatibilidade com clientes antigos), ele é comparado ao
+// preço do banco e diverência lança PriceMismatchError — mesma checagem de
+// antes, agora só sem exigir o campo.
 const orderItemSchema = z.object({
   productId: z.string().min(1, 'productId is required').max(64),
   quantity: z.number().int().positive('Quantity must be a positive integer').max(999),
-  unitPrice: z.number().positive('Unit price must be positive'),
+  unitPrice: z.number().positive('Unit price must be positive').optional(),
 });
 
 export const createOrderSchema = z.object({

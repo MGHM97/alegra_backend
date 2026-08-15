@@ -8,7 +8,7 @@ export const createSavedCardSchema = z.object({
   brand: cardBrandSchema,
   holderName: z.string().min(1, 'Holder name is required').max(100),
   expiryMonth: z.number().int().min(1).max(12),
-  expiryYear: z.number().int().min(2024),
+  expiryYear: z.number().int().min(new Date().getFullYear()),
   cardType: cardTypeSchema.optional().default('CREDIT'),
   holderDocument: z.string()
     .regex(/^\d{11}$|^\d{14}$/, 'Document must be CPF (11 digits) or CNPJ (14 digits)')
@@ -23,7 +23,7 @@ export const createSavedCardSchema = z.object({
     return data.expiryYear > currentYear ||
       (data.expiryYear === currentYear && data.expiryMonth >= currentMonth);
   },
-  { message: 'Cartao expirado. Informe uma data de validade futura.', path: ['expiryMonth'] },
+  { message: 'Cartão expirado. Informe uma data de validade futura.', path: ['expiryMonth'] },
 );
 
 export type CreateSavedCardInput = z.infer<typeof createSavedCardSchema>;
@@ -31,7 +31,7 @@ export type CreateSavedCardInput = z.infer<typeof createSavedCardSchema>;
 export const updateSavedCardSchema = z.object({
   holderName: z.string().min(1).max(100).optional(),
   expiryMonth: z.number().int().min(1).max(12).optional(),
-  expiryYear: z.number().int().min(2024).optional(),
+  expiryYear: z.number().int().min(new Date().getFullYear()).optional(),
   cardType: cardTypeSchema.optional(),
   isDefault: z.boolean().optional(),
 });
