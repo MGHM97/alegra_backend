@@ -1,0 +1,4 @@
+- [Baseline de migrations](migrations-baseline.md) — banco local nunca teve `_prisma_migrations` até 15/08/2026; nunca mais usar `db push`
+- [Bumps de dependência com CVE](dependency-bumps.md) — fluxo de investigação/aplicação e a trava de `@types/nodemailer` em 8.x
+- [Padrão de paginação por cursor](pagination-pattern.md) — replicar o padrão admin, mas com checagem de posse do cursor em recursos escopados por usuário
+- [Docker (Dockerfile + serviço api)](docker-deployment.md) — stages, gotchas de Alpine/musl (openssl, bcrypt), volumes e rede do compose

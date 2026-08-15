@@ -113,10 +113,33 @@ export class PrismaOrderRepository implements OrderRepository {
       ];
     }
 
+    if (filters?.cursor) {
+      // Zero-Trust ownership check: the cursor is an opaque order id that
+      // could in theory be copied/guessed from another user's pagination.
+      // Confirm it actually belongs to `userId` (and matches the same
+      // filters) before using it to position the query — otherwise Prisma
+      // would happily paginate from a row outside `where`, and a crafted
+      // cursor could be used to probe for the existence of other users'
+      // orders. Returning an empty page here (rather than an error) avoids
+      // distinguishing "cursor exists but isn't yours" from "cursor is
+      // bogus", which would itself leak information.
+      const cursorOrder = await prisma.order.findFirst({
+        where: { ...where, id: filters.cursor },
+        select: { id: true },
+      });
+      if (!cursorOrder) {
+        return [];
+      }
+    }
+
     const orders = await prisma.order.findMany({
       where,
       include: orderWithProductsInclude,
-      orderBy: { createdAt: 'desc' },
+      // id desc as a tie-breaker keeps pagination stable when multiple
+      // orders share the same createdAt millisecond (e.g. seeded/test data).
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      ...(filters?.limit ? { take: filters.limit + 1 } : {}),
+      ...(filters?.cursor ? { cursor: { id: filters.cursor }, skip: 1 } : {}),
     });
     return orders as unknown as OrderWithProductsEntity[];
   }

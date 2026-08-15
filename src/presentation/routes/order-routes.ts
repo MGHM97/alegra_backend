@@ -5,8 +5,8 @@ import {
   getOrderDetailHandler,
   cancelOrderHandler,
 } from '../controllers/order-controller.js';
-import { createOrderSchema } from '../schemas/order-schemas.js';
-import { validateBody } from '../../shared/middlewares/validate.js';
+import { createOrderSchema, listUserOrdersQuerySchema } from '../schemas/order-schemas.js';
+import { validateBody, validateQuery } from '../../shared/middlewares/validate.js';
 import { authGuard } from '../../shared/middlewares/auth-guard.js';
 
 export async function orderRoutes(fastify: FastifyInstance): Promise<void> {
@@ -18,6 +18,7 @@ export async function orderRoutes(fastify: FastifyInstance): Promise<void> {
   });
 
   fastify.get('/', {
+    preHandler: [validateQuery(listUserOrdersQuerySchema)],
     handler: listUserOrdersHandler,
   });
 

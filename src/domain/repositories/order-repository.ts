@@ -55,6 +55,15 @@ export interface CreateOrderInput {
 export interface OrderListFilters {
   period?: number; // months
   search?: string;
+  /**
+   * Cursor-based pagination (same pattern as admin-order-controller.ts):
+   * `cursor` is the `id` of the last order seen on the previous page,
+   * `limit` is the page size. When `limit` is set, the repository fetches
+   * `limit + 1` rows internally so the caller can detect `hasMore` without
+   * a second COUNT query.
+   */
+  cursor?: string;
+  limit?: number;
 }
 
 export interface OrderRepository {

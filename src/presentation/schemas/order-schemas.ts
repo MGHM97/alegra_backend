@@ -60,3 +60,18 @@ export const createOrderSchema = z.object({
 });
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
+
+/**
+ * GET /v1/orders — cursor-based pagination, same pattern as the admin
+ * orders listing. `limit` is capped at 50 (rather than silently clamped)
+ * so a client asking for too much gets an explicit 422 instead of silently
+ * receiving fewer rows than it thinks it asked for.
+ */
+export const listUserOrdersQuerySchema = z.object({
+  period: z.coerce.number().int().positive().optional(),
+  search: z.string().max(200).optional(),
+  cursor: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+export type ListUserOrdersQuery = z.infer<typeof listUserOrdersQuerySchema>;

@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -34,6 +32,44 @@ services:
       timeout: 5s
       retries: 5
 
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: alegra-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Dentro da rede do compose os serviços se enxergam pelo nome do
+      # serviço (postgres/redis), não por localhost — .env local costuma
+      # apontar para localhost (uso fora de container), então sobrescrevemos
+      # aqui só o necessário para a API falar com os outros serviços deste
+      # compose. Ajuste connection_limit/pool_timeout junto com o comentário
+      # em .env.example se mudar o pool do Prisma.
+      DATABASE_URL: postgresql://alegra:alegra_secret@postgres:5432/alegra_festas?schema=public&connection_limit=10&pool_timeout=20
+      REDIS_URL: redis://redis:6379
+      PORT: 3333
+    ports:
+      - '3333:3333'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      # Imagens de produto enviadas via POST /v1/admin/uploads/images ficam
+      # em disco (ver src/app.ts, prefix /uploads) — precisa de um volume
+      # nomeado para sobreviver a rebuilds/restarts do container.
+      - uploads:/app/public/uploads
+    # deploy:
+    #   replicas: 3
+    # Descomente para escalar horizontalmente. Múltiplas réplicas do mesmo
+    # serviço não expõem a porta do host diretamente sem conflito — coloque
+    # um proxy reverso/load balancer na frente da API para distribuir entre
+    # as réplicas (fora deste compose; o front vai trazer o seu).
+
 volumes:
   pgdata:
   redisdata:
+  uploads:

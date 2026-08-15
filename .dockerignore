@@ -1,0 +1,30 @@
+node_modules
+dist
+.git
+.gitignore
+
+# Env / secrets — nunca vão para a imagem, são injetados via env_file/env
+.env
+.env.*
+!.env.example
+
+# Uploads locais de dev — em produção isso é um volume, não conteúdo da imagem
+public/uploads/products/*
+!public/uploads/products/.gitkeep
+
+# Testes e ferramentas de dev não precisam estar na imagem final
+tests
+coverage
+*.test.ts
+
+# Editor / SO
+.vscode
+.idea
+*.log
+.DS_Store
+
+# Docs e arquivos de projeto que não afetam o runtime
+docs
+README.md
+docker-compose.yml
+Dockerfile

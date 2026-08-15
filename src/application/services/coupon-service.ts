@@ -23,13 +23,10 @@ export function normalizeCouponCode(code: string): string {
  * e arredonda para 2 casas decimais.
  */
 export function computeDiscount(subtotal: number, coupon: Coupon): number {
-  let discount = 0;
-
-  if (coupon.discountType === 'PERCENTAGE') {
-    discount = (subtotal * coupon.discountValue) / 100;
-  } else {
-    discount = coupon.discountValue;
-  }
+  let discount =
+    coupon.discountType === 'PERCENTAGE'
+      ? (subtotal * coupon.discountValue) / 100
+      : coupon.discountValue;
 
   if (discount > subtotal) {
     discount = subtotal;

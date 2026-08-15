@@ -1,7 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { PrismaOrderRepository } from '../../infra/database/prisma-order-repository.js';
-import type { CreateOrderInput } from '../schemas/order-schemas.js';
-import { successResponse } from '../../shared/utils/response.js';
+import type { CreateOrderInput, ListUserOrdersQuery } from '../schemas/order-schemas.js';
+import { successResponse, listResponse } from '../../shared/utils/response.js';
 import {
   ForbiddenError,
   NotFoundError,
@@ -168,7 +168,7 @@ export async function createOrderHandler(
 }
 
 export async function listUserOrdersHandler(
-  request: FastifyRequest<{ Querystring: { period?: string; search?: string } }>,
+  request: FastifyRequest<{ Querystring: ListUserOrdersQuery }>,
   reply: FastifyReply,
 ): Promise<void> {
   const currentUser = request.currentUser;
@@ -176,16 +176,24 @@ export async function listUserOrdersHandler(
     throw new UnauthorizedError();
   }
 
-  const period = request.query.period ? parseInt(request.query.period, 10) : undefined;
-  const search = request.query.search;
+  const { period, search, cursor, limit } = request.query;
 
   const orders = await orderRepository.findByUserIdWithProducts(currentUser.sub, {
-    period: period && !isNaN(period) ? period : undefined,
+    period,
     search,
+    cursor,
+    limit,
   });
 
-  const serialized = orders.map(serializeOrderWithProducts);
-  void reply.status(200).send(successResponse(serialized));
+  // Same cursor pattern as listAdminOrdersHandler: the repository fetched
+  // `limit + 1` rows, so a full page means there's more to paginate.
+  const hasMore = orders.length > limit;
+  const items = hasMore ? orders.slice(0, limit) : orders;
+  const lastItem = items[items.length - 1];
+  const nextCursor = hasMore && lastItem ? lastItem.id : null;
+
+  const serialized = items.map(serializeOrderWithProducts);
+  void reply.status(200).send(listResponse(serialized, nextCursor, hasMore));
 }
 
 export async function getOrderDetailHandler(
