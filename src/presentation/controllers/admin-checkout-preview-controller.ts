@@ -79,12 +79,25 @@ export async function createPreviewIntentHandler(
   const { items, shippingCost, couponCode, paymentMethod, savedCardId, installments } =
     request.body;
 
-  // Authoritative price revalidation — same as the real endpoint.
+  // Authoritative price revalidation — same as the real endpoint. Coupon
+  // and saved-card lookups are independent of the product fetch (keyed off
+  // couponCode / savedCardId, not off any product data), so all three run
+  // concurrently; the validations further down stay in their original
+  // order (products missing -> stock -> coupon -> saved-card ownership).
   const productIds = items.map((item) => item.productId);
-  const products = await prisma.product.findMany({
-    where: { id: { in: productIds }, isActive: true },
-    select: { id: true, price: true, stock: true, reservedStock: true, name: true },
-  });
+  const [products, prefetchedCoupon, prefetchedCard] = await Promise.all([
+    prisma.product.findMany({
+      where: { id: { in: productIds }, isActive: true },
+      select: { id: true, price: true, stock: true, reservedStock: true, name: true },
+    }),
+    couponCode ? findCouponByCode(couponCode) : Promise.resolve(null),
+    paymentMethod === 'saved_card' && savedCardId
+      ? prisma.savedCard.findFirst({
+          where: { id: savedCardId },
+          select: { id: true, userId: true },
+        })
+      : Promise.resolve(null),
+  ]);
 
   if (products.length !== productIds.length) {
     const found = new Set(products.map((p) => p.id));
@@ -114,7 +127,7 @@ export async function createPreviewIntentHandler(
   let appliedCouponCode: string | null = null;
 
   if (couponCode) {
-    const coupon = await findCouponByCode(couponCode);
+    const coupon = prefetchedCoupon;
     assertCouponUsable(coupon, subtotal);
     discountAmount = computeDiscount(subtotal, coupon);
     appliedCouponId = coupon.id;
@@ -125,10 +138,7 @@ export async function createPreviewIntentHandler(
   // is rejected even in preview to avoid leaking the existence of others'
   // cards.
   if (paymentMethod === 'saved_card' && savedCardId) {
-    const card = await prisma.savedCard.findFirst({
-      where: { id: savedCardId },
-      select: { id: true, userId: true },
-    });
+    const card = prefetchedCard;
     if (!card) {
       throw new NotFoundError('Cartão não encontrado.');
     }
@@ -267,18 +277,41 @@ export async function createPreviewOrderHandler(
 
   // Re-fetch products to get authoritative names + thumbnails for the
   // success-page summary. Same security boundary as the real endpoint.
+  // Coupon and address are independent lookups (keyed off couponCode /
+  // shippingAddressId, not off product data) — run all three concurrently;
+  // validations further down keep their original order.
   const productIds = items.map((item) => item.productId);
-  const products = await prisma.product.findMany({
-    where: { id: { in: productIds }, isActive: true },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      price: true,
-      thumbnailUrl: true,
-      images: true,
-    },
-  });
+  const [products, prefetchedCoupon, prefetchedAddr] = await Promise.all([
+    prisma.product.findMany({
+      where: { id: { in: productIds }, isActive: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        price: true,
+        thumbnailUrl: true,
+        images: true,
+      },
+    }),
+    couponCode ? findCouponByCode(couponCode) : Promise.resolve(null),
+    shippingAddressId && request.currentUser
+      ? prisma.address.findUnique({
+          where: { id: shippingAddressId },
+          select: {
+            userId: true,
+            recipientName: true,
+            label: true,
+            street: true,
+            number: true,
+            complement: true,
+            neighborhood: true,
+            city: true,
+            state: true,
+            zipCode: true,
+          },
+        })
+      : Promise.resolve(null),
+  ]);
 
   if (products.length !== productIds.length) {
     const found = new Set(products.map((p) => p.id));
@@ -311,7 +344,7 @@ export async function createPreviewOrderHandler(
   let appliedCouponCode: string | null = null;
 
   if (couponCode) {
-    const coupon = await findCouponByCode(couponCode);
+    const coupon = prefetchedCoupon;
     assertCouponUsable(coupon, subtotal);
     discountAmount = computeDiscount(subtotal, coupon);
     appliedCouponId = coupon.id;
@@ -335,21 +368,7 @@ export async function createPreviewOrderHandler(
   } | null = null;
 
   if (shippingAddressId && request.currentUser) {
-    const addr = await prisma.address.findUnique({
-      where: { id: shippingAddressId },
-      select: {
-        userId: true,
-        recipientName: true,
-        label: true,
-        street: true,
-        number: true,
-        complement: true,
-        neighborhood: true,
-        city: true,
-        state: true,
-        zipCode: true,
-      },
-    });
+    const addr = prefetchedAddr;
     // Even admins should only preview addresses that belong to them — keeps
     // PII boundaries clean and avoids leaking other users' addresses on
     // accident.

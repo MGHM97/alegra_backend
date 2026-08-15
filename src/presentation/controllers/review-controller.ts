@@ -9,8 +9,20 @@ import {
   UnauthorizedError,
 } from '../../domain/errors/app-error.js';
 import { userHasDeliveredPurchase } from '../../application/services/review-eligibility-service.js';
+import { cacheGet, cacheSet } from '../../infra/cache/cache-utils.js';
+import {
+  invalidateProductReviewsCache,
+  productReviewsBySlugCacheKey,
+  productReviewsCacheKey,
+} from '../../application/services/review-cache-service.js';
 
 const reviewRepository = new PrismaReviewRepository();
+
+// Páginas de produto batem em /product/:id e /slug/:slug a cada carregamento
+// — TTL curto o bastante para refletir novas avaliações em minutos, longo o
+// bastante para tirar a maior parte da carga do Postgres. Mesmo padrão de
+// product-controller.ts.
+const REVIEWS_LIST_TTL = 300; // 5 minutes
 
 interface SerializedReview {
   id: string;
@@ -55,16 +67,38 @@ export async function listReviewsBySlugHandler(
   request: FastifyRequest<{ Params: { slug: string } }>,
   reply: FastifyReply,
 ): Promise<void> {
-  const reviews = await reviewRepository.findByProductSlug(request.params.slug);
-  void reply.status(200).send(successResponse(reviews.map(serializeReview)));
+  const { slug } = request.params;
+  const cacheKey = productReviewsBySlugCacheKey(slug);
+  const cached = await cacheGet<unknown>(cacheKey);
+  if (cached) {
+    void reply.status(200).send(cached);
+    return;
+  }
+
+  const reviews = await reviewRepository.findByProductSlug(slug);
+  const response = successResponse(reviews.map(serializeReview));
+  await cacheSet(cacheKey, response, REVIEWS_LIST_TTL);
+
+  void reply.status(200).send(response);
 }
 
 export async function listReviewsByProductIdHandler(
   request: FastifyRequest<{ Params: { productId: string } }>,
   reply: FastifyReply,
 ): Promise<void> {
-  const reviews = await reviewRepository.findByProductId(request.params.productId);
-  void reply.status(200).send(successResponse(reviews.map(serializeReview)));
+  const { productId } = request.params;
+  const cacheKey = productReviewsCacheKey(productId);
+  const cached = await cacheGet<unknown>(cacheKey);
+  if (cached) {
+    void reply.status(200).send(cached);
+    return;
+  }
+
+  const reviews = await reviewRepository.findByProductId(productId);
+  const response = successResponse(reviews.map(serializeReview));
+  await cacheSet(cacheKey, response, REVIEWS_LIST_TTL);
+
+  void reply.status(200).send(response);
 }
 
 export async function createReviewHandler(
@@ -118,6 +152,11 @@ export async function createReviewHandler(
     }
     throw err;
   }
+
+  // Best-effort, fora do caminho crítico: se o Redis estiver indisponível,
+  // a review já foi persistida — o pior caso é a listagem cacheada ficar
+  // desatualizada até o TTL expirar, nunca uma falha na criação.
+  await invalidateProductReviewsCache(productId);
 
   void reply.status(201).send(successResponse(serializeReview(review)));
 }

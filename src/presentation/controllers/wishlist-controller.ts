@@ -69,8 +69,16 @@ export async function addToWishlistHandler(
 
   const { productId } = request.body;
 
+  // Produto e item-existente são lookups independentes (um por productId,
+  // outro por userId+productId) — buscados em paralelo. As validações
+  // abaixo continuam na mesma ordem (produto inexistente/inativo antes do
+  // caminho idempotente de "já existe").
+  const [product, existing] = await Promise.all([
+    productRepository.findById(productId),
+    wishlistRepository.findByUserAndProduct(currentUser.sub, productId),
+  ]);
+
   // Valida produto existe e está ativo
-  const product = await productRepository.findById(productId);
   if (!product) {
     throw new NotFoundError('Product');
   }
@@ -79,11 +87,6 @@ export async function addToWishlistHandler(
   }
 
   // Idempotente: verifica se já existe
-  const existing = await wishlistRepository.findByUserAndProduct(
-    currentUser.sub,
-    productId,
-  );
-
   if (existing) {
     void reply.status(200).send(
       successResponse({

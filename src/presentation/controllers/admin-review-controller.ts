@@ -4,6 +4,7 @@ import { listResponse } from '../../shared/utils/response.js';
 import { NotFoundError } from '../../domain/errors/app-error.js';
 import type { AdminListReviewsQuery } from '../schemas/review-schemas.js';
 import type { ReviewWithRelations } from '../../domain/entities/review.js';
+import { invalidateProductReviewsCache } from '../../application/services/review-cache-service.js';
 
 const reviewRepository = new PrismaReviewRepository();
 
@@ -70,5 +71,6 @@ export async function deleteAdminReviewHandler(
     throw new NotFoundError('Review');
   }
   await reviewRepository.delete(request.params.id);
+  await invalidateProductReviewsCache(existing.productId);
   void reply.status(204).send();
 }

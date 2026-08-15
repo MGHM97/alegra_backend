@@ -42,12 +42,19 @@ export async function createPaymentIntentHandler(
     installments,
   } = request.body;
 
-  // Validate prices from database to prevent price tampering
+  // Validate prices from database to prevent price tampering. The coupon
+  // lookup below only depends on `couponCode` (not on the product fetch),
+  // so both round-trips run concurrently — validation order (products
+  // missing -> stock -> coupon usability) is unchanged, only the fetch
+  // itself moves earlier.
   const productIds = items.map((item) => item.productId);
-  const products = await prisma.product.findMany({
-    where: { id: { in: productIds }, isActive: true },
-    select: { id: true, price: true, stock: true, reservedStock: true, name: true },
-  });
+  const [products, prefetchedCoupon] = await Promise.all([
+    prisma.product.findMany({
+      where: { id: { in: productIds }, isActive: true },
+      select: { id: true, price: true, stock: true, reservedStock: true, name: true },
+    }),
+    couponCode ? findCouponByCode(couponCode) : Promise.resolve(null),
+  ]);
 
   if (products.length !== productIds.length) {
     const found = new Set(products.map((p) => p.id));
@@ -77,7 +84,7 @@ export async function createPaymentIntentHandler(
   let appliedCouponCode: string | null = null;
 
   if (couponCode) {
-    const coupon = await findCouponByCode(couponCode);
+    const coupon = prefetchedCoupon;
     assertCouponUsable(coupon, subtotal);
     discountAmount = computeDiscount(subtotal, coupon);
     appliedCouponId = coupon.id;

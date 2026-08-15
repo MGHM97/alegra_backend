@@ -35,6 +35,10 @@
   ],
   "license": "UNLICENSED",
   "private": true,
+  "resolutions": {
+    "qs": "^6.15.2",
+    "form-data": "^4.0.6"
+  },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.2.0",

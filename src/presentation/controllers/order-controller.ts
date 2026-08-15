@@ -51,6 +51,42 @@ export async function createOrderHandler(
     }
   }
 
+  // paymentMethod is a pure function of the body — computed up front so it
+  // can gate the (conditional) saved-card lookup below without waiting on
+  // anything else.
+  const paymentMethod = normalizePaymentMethod(request.body.paymentMethod);
+
+  // Address lookup (keyed off shippingAddressId) and saved-card ownership
+  // lookup (keyed off savedCardId) are independent reads — run them
+  // concurrently. Validation below still happens in the original order
+  // (address NotFound/Forbidden before saved-card Forbidden), only the
+  // fetches themselves moved earlier.
+  const [addr, card] = await Promise.all([
+    request.body.shippingAddressId
+      ? prisma.address.findUnique({
+          where: { id: request.body.shippingAddressId },
+          select: {
+            userId: true,
+            recipientName: true,
+            label: true,
+            street: true,
+            number: true,
+            complement: true,
+            neighborhood: true,
+            city: true,
+            state: true,
+            zipCode: true,
+          },
+        })
+      : Promise.resolve(null),
+    paymentMethod === 'SAVED_CARD' && request.body.savedCardId
+      ? prisma.savedCard.findFirst({
+          where: { id: request.body.savedCardId },
+          select: { id: true, userId: true },
+        })
+      : Promise.resolve(null),
+  ]);
+
   // Resolve shipping address by id (Zero-Trust: must belong to the user).
   let shippingAddress: {
     recipientName: string | null;
@@ -64,21 +100,6 @@ export async function createOrderHandler(
   } | undefined;
 
   if (request.body.shippingAddressId) {
-    const addr = await prisma.address.findUnique({
-      where: { id: request.body.shippingAddressId },
-      select: {
-        userId: true,
-        recipientName: true,
-        label: true,
-        street: true,
-        number: true,
-        complement: true,
-        neighborhood: true,
-        city: true,
-        state: true,
-        zipCode: true,
-      },
-    });
     if (!addr) {
       throw new NotFoundError('Endereço não encontrado.');
     }
@@ -97,8 +118,6 @@ export async function createOrderHandler(
     };
   }
 
-  const paymentMethod = normalizePaymentMethod(request.body.paymentMethod);
-
   // For non-card flows, the payment status is meaningful at creation time:
   // PIX/Boleto are awaiting customer action, saved_card may have already
   // succeeded (off_session confirm). The frontend reports status; the webhook
@@ -113,10 +132,6 @@ export async function createOrderHandler(
   // the check in the payment controller, since the order can in theory be
   // created with a paymentIntent that was generated earlier.
   if (paymentMethod === 'SAVED_CARD' && request.body.savedCardId) {
-    const card = await prisma.savedCard.findFirst({
-      where: { id: request.body.savedCardId },
-      select: { id: true, userId: true },
-    });
     if (!card || card.userId !== currentUser.sub) {
       throw new ForbiddenError('Cartão não pertence a este usuário.');
     }
