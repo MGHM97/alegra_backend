@@ -19,6 +19,11 @@ export interface PaginatedResult<T> {
   items: T[];
   cursor: string | null;
   hasMore: boolean;
+  // Contagem total de produtos que casam os mesmos filtros, ignorando o
+  // cursor — alimenta "Mostrando N de M" no front. Sempre calculado (a
+  // página já cacheia o resultado inteiro, então o custo do count() extra
+  // só é pago uma vez por combinação de filtros/página, não por request).
+  total: number;
 }
 
 export interface CreateProductInput {

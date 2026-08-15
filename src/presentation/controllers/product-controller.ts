@@ -41,7 +41,7 @@ export async function listProductsHandler(
     soldCount: item.soldCount,
   }));
 
-  const response = listResponse(serialized, result.cursor, result.hasMore);
+  const response = listResponse(serialized, result.cursor, result.hasMore, result.total);
   await cacheSet(cacheKey, response, PRODUCTS_LIST_TTL);
 
   void reply.status(200).send(response);

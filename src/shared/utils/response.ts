@@ -15,6 +15,11 @@ export interface ListResponse<T> {
   meta: {
     cursor: string | null;
     hasMore: boolean;
+    // Opcional: só GET /v1/products preenche hoje ("Mostrando N de M").
+    // Omitido (não `undefined` explícito) para outros listResponse() —
+    // count com os mesmos filtros custa uma query extra, só vale a pena
+    // onde o front realmente exibe o total.
+    total?: number;
   };
 }
 
@@ -30,10 +35,11 @@ export function listResponse<T>(
   data: T[],
   cursor: string | null,
   hasMore: boolean,
+  total?: number,
 ): ListResponse<T> {
   return {
     status: 'success',
     data,
-    meta: { cursor, hasMore },
+    meta: total === undefined ? { cursor, hasMore } : { cursor, hasMore, total },
   };
 }

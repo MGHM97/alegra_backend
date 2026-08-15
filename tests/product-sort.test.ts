@@ -205,4 +205,32 @@ describe('GET /v1/products — server-side sort', () => {
       .query({ category: CATEGORY, cursor: 'not-a-valid-cursor-or-uuid!!' });
     expect(res.status).toBe(422);
   });
+
+  it('meta.total — matches the count of active products for the filter, independent of limit', async () => {
+    const res = await (await api()).get('/v1/products').query({ category: CATEGORY, limit: 2 });
+    expect(res.status).toBe(200);
+    // Only 2 of the 6 fixtures come back in `data` (limit=2), but total
+    // counts all 6 that match the filter, not just the returned page.
+    expect(res.body.data).toHaveLength(2);
+    expect(res.body.meta.total).toBe(6);
+  });
+
+  it('meta.total — narrows with an additional filter (minPrice excludes A and B)', async () => {
+    const res = await (await api()).get('/v1/products').query({ category: CATEGORY, minPrice: 30 });
+    expect(res.status).toBe(200);
+    // A=10, B=20 excluded; C=30, D=40, E=50, F=60 match.
+    expect(res.body.meta.total).toBe(4);
+  });
+
+  it('meta.total — stays constant across paginated pages of the same filter', async () => {
+    const agent = await api();
+
+    const page1 = await agent.get('/v1/products').query({ category: CATEGORY, sort: 'price_asc', limit: 2 });
+    expect(page1.body.meta.total).toBe(6);
+
+    const page2 = await agent
+      .get('/v1/products')
+      .query({ category: CATEGORY, sort: 'price_asc', limit: 2, cursor: page1.body.meta.cursor as string });
+    expect(page2.body.meta.total).toBe(6);
+  });
 });

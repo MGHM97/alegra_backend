@@ -238,6 +238,11 @@ export class PrismaProductRepository implements ProductRepository {
       where.badges = { hasSome: filters.badges };
     }
 
+    // Total independe do cursor (é sempre "quantos produtos casam esses
+    // filtros", não "quantos restam a partir daqui") — dispara em paralelo
+    // com a resolução do cursor/findMany abaixo em vez de esperar por eles.
+    const totalPromise = prisma.product.count({ where });
+
     let effectiveSort = resolveEffectiveSort(filters.sort);
     let cursorWhere: Prisma.ProductWhereInput | undefined;
 
@@ -254,8 +259,9 @@ export class PrismaProductRepository implements ProductRepository {
         });
         if (!legacyProduct) {
           // Referenced row no longer exists (deleted between page loads) —
-          // degrade to "no more results" instead of erroring.
-          return { items: [], cursor: null, hasMore: false };
+          // degrade to "no more results" instead of erroring. `total` still
+          // reflects the filters (it never depended on the cursor).
+          return { items: [], cursor: null, hasMore: false, total: await totalPromise };
         }
         effectiveSort = 'newest';
         cursorWhere = newestCursorWhere(legacyProduct.createdAt, decoded.id);
@@ -267,19 +273,22 @@ export class PrismaProductRepository implements ProductRepository {
     const finalWhere: Prisma.ProductWhereInput = cursorWhere ? { AND: [where, cursorWhere] } : where;
     const take = pagination.limit + 1;
 
-    const rows = await prisma.product.findMany({
-      where: finalWhere,
-      take,
-      orderBy: buildOrderBy(effectiveSort),
-      select: PRODUCT_LIST_SELECT,
-    });
+    const [rows, total] = await Promise.all([
+      prisma.product.findMany({
+        where: finalWhere,
+        take,
+        orderBy: buildOrderBy(effectiveSort),
+        select: PRODUCT_LIST_SELECT,
+      }),
+      totalPromise,
+    ]);
 
     const hasMore = rows.length > pagination.limit;
     const pageRows = hasMore ? rows.slice(0, pagination.limit) : rows;
     const lastRow = pageRows[pageRows.length - 1];
     const cursor = hasMore && lastRow ? encodeCursorForRow(effectiveSort, lastRow) : null;
 
-    return { items: pageRows.map(toListItem), cursor, hasMore };
+    return { items: pageRows.map(toListItem), cursor, hasMore, total };
   }
 
   async getAvailableStock(productId: string): Promise<number> {

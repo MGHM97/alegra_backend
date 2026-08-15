@@ -11,7 +11,13 @@ import { registerRoutes } from './presentation/routes/index.js';
 import { globalErrorHandler } from './shared/middlewares/error-handler.js';
 import { prisma } from './infra/database/prisma-client.js';
 import { cacheGet, cacheSet } from './infra/cache/cache-utils.js';
-import { SITEMAP_CACHE_KEY, SITEMAP_CACHE_TTL_SECONDS } from './shared/utils/sitemap.js';
+import {
+  SITEMAP_CACHE_KEY,
+  SITEMAP_CACHE_TTL_SECONDS,
+  SITEMAP_MAX_IMAGES_PER_PRODUCT,
+  escapeXml,
+  resolveSitemapImageUrl,
+} from './shared/utils/sitemap.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -111,7 +117,7 @@ export async function buildApp() {
     const [products, categoryRows] = await Promise.all([
       prisma.product.findMany({
         where: { isActive: true },
-        select: { slug: true, updatedAt: true },
+        select: { slug: true, updatedAt: true, name: true, images: true },
         orderBy: { updatedAt: 'desc' },
       }),
       // Categorias não são um enum de banco (Product.category é String livre)
@@ -137,7 +143,8 @@ export async function buildApp() {
     ];
 
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
-    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
+    xml +=
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n';
 
     for (const page of staticPages) {
       xml += `  <url>\n    <loc>${baseUrl}${page.loc}</loc>\n    <changefreq>${page.changefreq}</changefreq>\n    <priority>${page.priority}</priority>\n  </url>\n`;
@@ -149,7 +156,17 @@ export async function buildApp() {
 
     for (const product of products) {
       const lastmod = product.updatedAt.toISOString().split('T')[0];
-      xml += `  <url>\n    <loc>${baseUrl}/produto/${product.slug}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>\n`;
+      xml += `  <url>\n    <loc>${baseUrl}/produto/${product.slug}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n`;
+
+      // Sitemap de imagens (Google Imagens): até 5 <image:image> por produto.
+      // `images[]` pode ter URL absoluta (seed) ou caminho relativo de upload
+      // (/uploads/...) — resolveSitemapImageUrl normaliza para absoluto.
+      for (const image of product.images.slice(0, SITEMAP_MAX_IMAGES_PER_PRODUCT)) {
+        const imageUrl = resolveSitemapImageUrl(baseUrl, image);
+        xml += `    <image:image>\n      <image:loc>${escapeXml(imageUrl)}</image:loc>\n      <image:title>${escapeXml(product.name)}</image:title>\n    </image:image>\n`;
+      }
+
+      xml += '  </url>\n';
     }
 
     xml += '</urlset>';
