@@ -106,6 +106,26 @@ export class EmailService {
     await this.send(to, 'Pedido Enviado - Alegra Festas', html);
   }
 
+  async sendReviewReminder(
+    to: string,
+    name: string,
+    orderId: string,
+  ): Promise<void> {
+    const orderCode = orderId.slice(0, 8).toUpperCase();
+    const myOrdersUrl = `${env.PUBLIC_SITE_URL}/meus-pedidos`;
+    const html = baseLayout(
+      'Como foi sua festa?',
+      `<p style="color:#564c47;line-height:1.6">Ola, <strong>${name}</strong>!</p>
+       <p style="color:#564c47;line-height:1.6">Como foi sua festa? Avalie os produtos do pedido <strong>#${orderCode}</strong> e ajude outros clientes a escolher com confianca.</p>
+       <div style="text-align:center;margin:24px 0">
+         <a href="${myOrdersUrl}" style="display:inline-block;padding:12px 32px;background:#eb6464;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;font-size:16px">Avaliar Produtos</a>
+       </div>
+       <p style="color:#a99c92;font-size:13px">Voce recebe este lembrete uma unica vez, alguns dias apos a entrega.</p>`,
+    );
+
+    await this.send(to, `Avalie os produtos do pedido #${orderCode} - Alegra Festas`, html);
+  }
+
   async sendContactForm(
     fromName: string,
     fromEmail: string,

@@ -184,10 +184,21 @@ export class PaymentService {
     );
   }
 
-  async createRefund(paymentIntentId: string): Promise<string> {
-    const refund = await stripe.refunds.create({
+  /**
+   * Cria um reembolso na Stripe. Quando `amountInCents` é omitido, a Stripe
+   * reembolsa o saldo integral ainda reembolsável do charge (comportamento
+   * histórico, usado no reembolso total). Quando informado, reembolsa
+   * exatamente esse valor — usado no reembolso parcial via
+   * `POST /v1/admin/orders/:id/refund`.
+   */
+  async createRefund(paymentIntentId: string, amountInCents?: number): Promise<string> {
+    const params: Parameters<typeof stripe.refunds.create>[0] = {
       payment_intent: paymentIntentId,
-    });
+    };
+    if (amountInCents !== undefined) {
+      params.amount = amountInCents;
+    }
+    const refund = await stripe.refunds.create(params);
     return refund.id;
   }
 }

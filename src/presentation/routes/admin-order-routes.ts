@@ -8,6 +8,7 @@ import {
   adminOrderFiltersSchema,
   updateOrderStatusSchema,
 } from '../schemas/admin-order-schemas.js';
+import { refundOrderSchema } from '../schemas/refund-schemas.js';
 import { validateQuery, validateBody } from '../../shared/middlewares/validate.js';
 import { authGuard, requireRole } from '../../shared/middlewares/auth-guard.js';
 
@@ -26,6 +27,7 @@ export async function adminOrderRoutes(fastify: FastifyInstance): Promise<void> 
   });
 
   fastify.post('/:id/refund', {
+    preHandler: [validateBody(refundOrderSchema)],
     handler: refundOrderHandler,
   });
 }

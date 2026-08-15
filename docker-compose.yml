@@ -16,6 +16,49 @@ services:
       timeout: 5s
       retries: 5
 
+  # Backup automático do Postgres: pg_dump em formato custom (-Fc, permite
+  # restore seletivo/paralelo) a cada 24h, retendo os últimos 7 dias.
+  #
+  # Como restaurar um dump (ambiente já provisionado, contêiner `postgres`
+  # rodando):
+  #   1. Copie o dump do volume para fora do contêiner, se necessário:
+  #        docker compose cp backup:/backups/alegra_YYYYMMDD_HHMM.dump ./
+  #   2. Restaure por cima do banco atual (--clean derruba objetos existentes
+  #      antes de recriá-los; use com cuidado — é destrutivo para o estado
+  #      atual do schema/dados):
+  #        docker compose exec -T postgres pg_restore \
+  #          -U alegra -d alegra_festas --clean --if-exists \
+  #          < alegra_YYYYMMDD_HHMM.dump
+  #      (ou, com o arquivo já dentro do volume `pgbackups`, rode o mesmo
+  #      pg_restore de dentro do próprio serviço `backup`.)
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: alegra_secret
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - pgbackups:/backups
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -eu
+        echo "[backup] job started — dumping every 24h, retention 7 days"
+        while true; do
+          TIMESTAMP=$$(date +%Y%m%d_%H%M)
+          FILE="/backups/alegra_$${TIMESTAMP}.dump"
+          echo "[backup] $$(date -Iseconds) starting dump -> $${FILE}"
+          if pg_dump -h postgres -U alegra -d alegra_festas -Fc -f "$${FILE}"; then
+            echo "[backup] $$(date -Iseconds) dump completed: $${FILE}"
+          else
+            echo "[backup] $$(date -Iseconds) dump FAILED for $${FILE}" >&2
+          fi
+          find /backups -name 'alegra_*.dump' -mtime +7 -delete
+          sleep 86400
+        done
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -88,5 +131,6 @@ services:
 
 volumes:
   pgdata:
+  pgbackups:
   redisdata:
   uploads:

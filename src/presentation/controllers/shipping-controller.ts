@@ -1,4 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { env } from '../../infra/config/env.js';
 import { successResponse } from '../../shared/utils/response.js';
 import type { CalculateShippingInput } from '../schemas/shipping-schemas.js';
 
@@ -9,6 +10,28 @@ interface ShippingOption {
   estimatedDays: number;
   carrier: string;
 }
+
+export type ShippingZone = 'local' | 'national';
+
+/**
+ * Metadados de frete grátis progressivo. `remaining` é sempre
+ * `max(0, threshold - subtotal)` — quando `subtotal` não é enviado no
+ * request, `remaining` cai no próprio `threshold` (nada foi abatido ainda).
+ */
+export interface FreeShippingMeta {
+  threshold: number;
+  remaining: number;
+  eligible: boolean;
+  zone: ShippingZone;
+}
+
+export interface ShippingCalculationResponse {
+  status: 'success';
+  data: ShippingOption[];
+  meta: { freeShipping: FreeShippingMeta };
+}
+
+const FREE_SHIPPING_SUFFIX = ' — Frete grátis';
 
 /**
  * Manaus (capital do Amazonas) CEP range: 69000-000 a 69099-999.
@@ -110,21 +133,65 @@ function estimateCorreios(cleanZip: string): ShippingOption[] {
   ];
 }
 
+/**
+ * Torna grátis a opção mais barata dentre as NÃO-pickup (retirada na loja já
+ * é grátis por padrão e fica de fora da comparação). Em caso de empate de
+ * preço, a primeira opção encontrada (ordem em que aparecem na resposta)
+ * vence — determinístico e estável entre chamadas.
+ */
+function applyFreeShipping(options: ShippingOption[]): ShippingOption[] {
+  let cheapestIndex = -1;
+  let cheapestPrice = Number.POSITIVE_INFINITY;
+
+  options.forEach((option, index) => {
+    if (option.id === 'store-pickup') return;
+    if (option.price < cheapestPrice) {
+      cheapestPrice = option.price;
+      cheapestIndex = index;
+    }
+  });
+
+  if (cheapestIndex === -1) return options;
+
+  return options.map((option, index) =>
+    index === cheapestIndex
+      ? { ...option, price: 0, name: `${option.name}${FREE_SHIPPING_SUFFIX}` }
+      : option,
+  );
+}
+
 export async function calculateShippingHandler(
   request: FastifyRequest<{ Body: CalculateShippingInput }>,
   reply: FastifyReply,
 ): Promise<void> {
-  const { zipCode } = request.body;
+  const { zipCode, subtotal } = request.body;
   const cleanZip = zipCode.replace(/\D/g, '');
+  const isManaus = isManausZipCode(cleanZip);
 
   const correiosOptions = estimateCorreios(cleanZip);
 
   // "Retirar na loja" sempre encabeça a lista (grátis, ~1 dia útil).
-  const deliveryOptions: ShippingOption[] = isManausZipCode(cleanZip)
+  const deliveryOptions: ShippingOption[] = isManaus
     ? [buildManausLocalOption(), ...correiosOptions]
     : correiosOptions;
 
-  const options: ShippingOption[] = [buildStorePickupOption(), ...deliveryOptions];
+  let options: ShippingOption[] = [buildStorePickupOption(), ...deliveryOptions];
 
-  void reply.status(200).send(successResponse(options));
+  const zone: ShippingZone = isManaus ? 'local' : 'national';
+  const threshold = zone === 'local'
+    ? env.FREE_SHIPPING_THRESHOLD_LOCAL
+    : env.FREE_SHIPPING_THRESHOLD_NATIONAL;
+  const eligible = subtotal !== undefined && subtotal >= threshold;
+  const remaining = subtotal !== undefined ? Math.max(0, threshold - subtotal) : threshold;
+
+  if (eligible) {
+    options = applyFreeShipping(options);
+  }
+
+  const response: ShippingCalculationResponse = {
+    ...successResponse(options),
+    meta: { freeShipping: { threshold, remaining, eligible, zone } },
+  };
+
+  void reply.status(200).send(response);
 }

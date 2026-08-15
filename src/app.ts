@@ -10,6 +10,8 @@ import { env } from './infra/config/env.js';
 import { registerRoutes } from './presentation/routes/index.js';
 import { globalErrorHandler } from './shared/middlewares/error-handler.js';
 import { prisma } from './infra/database/prisma-client.js';
+import { cacheGet, cacheSet } from './infra/cache/cache-utils.js';
+import { SITEMAP_CACHE_KEY, SITEMAP_CACHE_TTL_SECONDS } from './shared/utils/sitemap.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -94,29 +96,44 @@ export async function buildApp() {
     return { status: 'ok', timestamp: new Date().toISOString() };
   });
 
+  // Público, cacheado em Redis por SITEMAP_CACHE_TTL_SECONDS (1h) —
+  // invalidado explicitamente em create/update/delete de produto (ver
+  // admin-product-controller.ts, junto de cacheInvalidatePattern('products:*')).
   fastify.get('/sitemap.xml', async (_request, reply) => {
-    const baseUrl = env.CORS_ORIGIN.split(',')[0]?.trim() ?? 'https://www.alegrafestas.com.br';
+    const cached = await cacheGet<string>(SITEMAP_CACHE_KEY);
+    if (cached) {
+      void reply.header('Content-Type', 'application/xml').status(200).send(cached);
+      return;
+    }
 
-    const products = await prisma.product.findMany({
-      where: { isActive: true },
-      select: { slug: true, updatedAt: true },
-      orderBy: { updatedAt: 'desc' },
-    });
+    const baseUrl = env.PUBLIC_SITE_URL.replace(/\/+$/, '');
+
+    const [products, categoryRows] = await Promise.all([
+      prisma.product.findMany({
+        where: { isActive: true },
+        select: { slug: true, updatedAt: true },
+        orderBy: { updatedAt: 'desc' },
+      }),
+      // Categorias não são um enum de banco (Product.category é String livre)
+      // — a lista "canônica" é o conjunto de categorias em uso por produtos
+      // ativos, para nunca listar categorias vazias/descontinuadas no sitemap.
+      prisma.product.findMany({
+        where: { isActive: true },
+        select: { category: true },
+        distinct: ['category'],
+        orderBy: { category: 'asc' },
+      }),
+    ]);
 
     const staticPages = [
       { loc: '/', priority: '1.0', changefreq: 'daily' },
       { loc: '/produtos', priority: '0.9', changefreq: 'daily' },
+      { loc: '/categorias', priority: '0.7', changefreq: 'weekly' },
       { loc: '/contato', priority: '0.5', changefreq: 'monthly' },
       { loc: '/faq', priority: '0.5', changefreq: 'monthly' },
       { loc: '/trocas-devolucoes', priority: '0.4', changefreq: 'monthly' },
       { loc: '/termos-de-uso', priority: '0.3', changefreq: 'yearly' },
       { loc: '/privacidade', priority: '0.3', changefreq: 'yearly' },
-    ];
-
-    const categories = [
-      'baloes', 'boleira-bandejas', 'confeitaria', 'bomboniere',
-      'descartaveis', 'papelaria', 'topos-de-bolo', 'kits-festa',
-      'velas', 'lembrancinhas', 'lanca-confetes', 'cortinas-metalizadas',
     ];
 
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
@@ -126,8 +143,8 @@ export async function buildApp() {
       xml += `  <url>\n    <loc>${baseUrl}${page.loc}</loc>\n    <changefreq>${page.changefreq}</changefreq>\n    <priority>${page.priority}</priority>\n  </url>\n`;
     }
 
-    for (const cat of categories) {
-      xml += `  <url>\n    <loc>${baseUrl}/produtos?category=${cat}</loc>\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>\n  </url>\n`;
+    for (const { category } of categoryRows) {
+      xml += `  <url>\n    <loc>${baseUrl}/produtos?category=${encodeURIComponent(category)}</loc>\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>\n  </url>\n`;
     }
 
     for (const product of products) {
@@ -137,6 +154,7 @@ export async function buildApp() {
 
     xml += '</urlset>';
 
+    await cacheSet(SITEMAP_CACHE_KEY, xml, SITEMAP_CACHE_TTL_SECONDS);
     void reply.header('Content-Type', 'application/xml').status(200).send(xml);
   });
 

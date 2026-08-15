@@ -75,6 +75,15 @@ enum PaymentStatus {
   SUCCEEDED
   FAILED
   CANCELED
+  // Contestação (chargeback) aberta pelo titular do cartão junto ao banco
+  // emissor — ver charge.dispute.created no webhookHandler. Não altera
+  // estoque por si só (a disputa pode ser vencida pelo lojista).
+  DISPUTED
+  // Reembolso parcial (valor < total cobrado, incluindo juros de
+  // parcelamento). Estoque NUNCA é liberado neste status — só o reembolso
+  // total (REFUNDED) devolve estoque.
+  PARTIALLY_REFUNDED
+  REFUNDED
 }
 
 model User {
@@ -210,11 +219,25 @@ model Order {
   shippingMethodName String?    @map("shipping_method_name")
   shippingCost      Decimal?    @map("shipping_cost") @db.Decimal(12, 2)
   deliveredAt       DateTime?   @map("delivered_at")
+  // Marcado quando o job de lembrete de avaliação pós-entrega envia o
+  // e-mail para este pedido (ver review-reminder-service.ts). Impede reenvio
+  // e serve de "já processado" mesmo se o pedido nunca vier a ser avaliado.
+  reviewReminderSentAt DateTime? @map("review_reminder_sent_at")
   couponId          String?     @map("coupon_id")
   couponCode        String?     @map("coupon_code")
   discountAmount    Decimal?    @map("discount_amount") @db.Decimal(12, 2)
   paymentMethod     PaymentMethod? @map("payment_method")
   paymentStatus     PaymentStatus? @map("payment_status")
+  // Marcado quando paymentStatus transiciona para SUCCEEDED (ver
+  // confirmOrderPayment() e a reconciliação em webhookHandler). Fonte de
+  // verdade para a janela de 90 dias do reembolso de Pix — updatedAt NÃO
+  // serve para isso, pois qualquer alteração no pedido (envio, disputa,
+  // reembolso parcial) também move updatedAt, "resetando" a janela.
+  paidAt            DateTime?   @map("paid_at")
+  // Soma acumulada já reembolsada (reais). 0 = nada reembolsado ainda;
+  // == totalAmount + installmentFee = reembolso total. Permite reembolsos
+  // parciais sucessivos sem exceder o valor efetivamente cobrado.
+  refundedAmount    Decimal     @default(0) @map("refunded_amount") @db.Decimal(12, 2)
   installments      Int         @default(1)
   installmentFee    Decimal?    @map("installment_fee") @db.Decimal(12, 2)
   pixQrCode         String?     @map("pix_qr_code")

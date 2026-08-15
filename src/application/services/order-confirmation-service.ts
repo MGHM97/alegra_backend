@@ -40,6 +40,10 @@ export async function confirmOrderPayment(
           data: {
             status: input.toStatus,
             ...(input.paymentStatus ? { paymentStatus: input.paymentStatus } : {}),
+            // Fonte de verdade para a janela de 90 dias de reembolso do Pix
+            // (ver refund-controller.ts) — updatedAt não serve, pois
+            // qualquer alteração posterior do pedido também o move.
+            ...(input.paymentStatus === 'SUCCEEDED' ? { paidAt: new Date() } : {}),
           },
         });
 

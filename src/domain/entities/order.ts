@@ -19,7 +19,10 @@ export type PaymentStatus =
   | 'PROCESSING'
   | 'SUCCEEDED'
   | 'FAILED'
-  | 'CANCELED';
+  | 'CANCELED'
+  | 'DISPUTED'
+  | 'PARTIALLY_REFUNDED'
+  | 'REFUNDED';
 
 export interface OrderItemEntity {
   id: string;
@@ -56,6 +59,8 @@ export interface OrderEntity {
   discountAmount: Decimal | null;
   paymentMethod: PaymentMethod | null;
   paymentStatus: PaymentStatus | null;
+  paidAt: Date | null;
+  refundedAmount: Decimal;
   installments: number;
   installmentFee: Decimal | null;
   pixQrCode: string | null;

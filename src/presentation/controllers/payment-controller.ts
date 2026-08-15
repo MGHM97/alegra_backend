@@ -13,11 +13,15 @@ import {
 } from '../../domain/errors/app-error.js';
 import { EmailService } from '../../application/services/email-service.js';
 import { confirmOrderPayment } from '../../application/services/order-confirmation-service.js';
+import { InventoryService } from '../../application/services/inventory-service.js';
 import {
   computeDiscount,
   findCouponByCode,
   assertCouponUsable,
+  releaseCouponUsage,
 } from '../../application/services/coupon-service.js';
+import { cacheInvalidatePattern } from '../../infra/cache/cache-utils.js';
+import { chargedTotalCents } from '../../shared/utils/refund-amount.js';
 import type { CreatePaymentIntentInput } from '../schemas/payment-schemas.js';
 import { PIX_MAX_AMOUNT_CENTS, PIX_MIN_AMOUNT_CENTS } from '../schemas/payment-schemas.js';
 import { computeChargeableTotal } from '../../shared/utils/installments.js';
@@ -52,6 +56,7 @@ function deriveIdempotencyKey(
 
 const paymentService = new PaymentService();
 const emailService = new EmailService();
+const inventoryService = new InventoryService();
 
 export async function createPaymentIntentHandler(
   request: FastifyRequest<{ Body: CreatePaymentIntentInput }>,
@@ -254,6 +259,13 @@ export async function createPaymentIntentHandler(
   );
 }
 
+/**
+ * Eventos Stripe tratados por este handler (configurar no endpoint do
+ * webhook / `stripe listen --events`):
+ *   payment_intent.succeeded, payment_intent.payment_failed,
+ *   payment_intent.canceled, charge.refunded,
+ *   charge.dispute.created, charge.dispute.closed
+ */
 export async function webhookHandler(
   request: FastifyRequest,
   reply: FastifyReply,
@@ -365,7 +377,12 @@ export async function webhookHandler(
         }
         await prisma.order.update({
           where: { id: order.id },
-          data: { paymentStatus: 'SUCCEEDED' },
+          data: {
+            paymentStatus: 'SUCCEEDED',
+            // Não sobrescreve um paidAt já existente (reconciliação pode
+            // rodar mais de uma vez para o mesmo pedido).
+            paidAt: order.paidAt ?? new Date(),
+          },
         });
       }
     }
@@ -376,6 +393,298 @@ export async function webhookHandler(
         where: { paymentIntentId: paymentIntent.id },
         data: { paymentStatus: 'FAILED' },
       });
+    }
+
+    if (event.type === 'payment_intent.canceled') {
+      const paymentIntent = event.data.object;
+      const order = await prisma.order.findUnique({
+        where: { paymentIntentId: paymentIntent.id },
+        include: { items: true },
+      });
+
+      if (!order) {
+        logger.warn(
+          { paymentIntentId: paymentIntent.id, eventId: event.id },
+          'Webhook payment_intent.canceled sem pedido correspondente (órfão)',
+        );
+      } else if (order.status === 'PENDING' || order.status === 'RESERVED') {
+        // Reivindica o cancelamento atomicamente ANTES de tocar no estoque —
+        // mesmo padrão de cancelOrderHandler/admin CANCELLED: evita
+        // double-release se o cliente cancelou ao mesmo tempo que o
+        // PaymentIntent expirou/foi cancelado na Stripe.
+        const claim = await prisma.order.updateMany({
+          where: { id: order.id, status: order.status },
+          data: { status: 'CANCELLED', paymentStatus: 'CANCELED' },
+        });
+
+        if (claim.count === 0) {
+          logger.warn(
+            { orderId: order.id, paymentIntentId: paymentIntent.id },
+            'payment_intent.canceled: pedido mudou de status durante a reconciliação — ignorado',
+          );
+        } else {
+          await prisma.$transaction(async (tx) => {
+            // order.status aqui é o status ANTES do claim (PENDING/RESERVED —
+            // pré-venda, commitSale nunca rodou): libera a reserva, nunca o
+            // estoque físico.
+            await inventoryService.releaseOrderStock(
+              tx,
+              order.id,
+              order.items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+              order.status,
+              `PaymentIntent canceled for order ${order.id}`,
+            );
+
+            if (order.couponId) {
+              await releaseCouponUsage(tx, order.couponId);
+            }
+          });
+
+          await cacheInvalidatePattern('products:*');
+          logger.info(
+            { orderId: order.id, paymentIntentId: paymentIntent.id },
+            'PaymentIntent cancelado — reserva de estoque liberada',
+          );
+        }
+      } else {
+        logger.info(
+          { orderId: order.id, status: order.status, paymentIntentId: paymentIntent.id },
+          'payment_intent.canceled para pedido fora de PENDING/RESERVED — ignorado (sem estoque a liberar)',
+        );
+      }
+    }
+
+    if (event.type === 'charge.refunded') {
+      const charge = event.data.object;
+      const paymentIntentId =
+        typeof charge.payment_intent === 'string'
+          ? charge.payment_intent
+          : (charge.payment_intent?.id ?? null);
+
+      if (!paymentIntentId) {
+        logger.warn(
+          { chargeId: charge.id, eventId: event.id },
+          'Webhook charge.refunded sem payment_intent associado',
+        );
+      } else {
+        const order = await prisma.order.findUnique({
+          where: { paymentIntentId },
+          include: { items: true },
+        });
+
+        if (!order) {
+          logger.warn(
+            { paymentIntentId, chargeId: charge.id, eventId: event.id },
+            'Webhook charge.refunded sem pedido correspondente (órfão)',
+          );
+        } else if (order.paymentStatus === 'REFUNDED') {
+          // Reembolso total já foi processado pela nossa própria API
+          // (refund-controller.ts): esta entrega é a confirmação da Stripe
+          // do que nós mesmos disparamos — no-op, sem tocar estoque de novo.
+        } else {
+          const isFullyRefunded = charge.amount_refunded >= charge.amount;
+
+          if (isFullyRefunded) {
+            if (order.status === 'REFUNDED') {
+              // Estoque já foi liberado antes (ex.: por charge.dispute.closed
+              // 'lost'); só falta reconciliar paymentStatus/refundedAmount.
+              await prisma.order.update({
+                where: { id: order.id },
+                data: {
+                  paymentStatus: 'REFUNDED',
+                  refundedAmount: new Prisma.Decimal(charge.amount_refunded / 100),
+                },
+              });
+            } else {
+              // Reembolso feito fora da nossa API (Dashboard da Stripe, por
+              // exemplo): reconciliamos aqui com o MESMO claim atômico +
+              // liberação de estoque do refund-controller.ts, para que o
+              // pedido e o estoque fiquem consistentes independente de onde
+              // o estorno foi originado.
+              const claim = await prisma.order.updateMany({
+                where: { id: order.id, status: order.status },
+                data: {
+                  status: 'REFUNDED',
+                  paymentStatus: 'REFUNDED',
+                  refundedAmount: new Prisma.Decimal(charge.amount_refunded / 100),
+                },
+              });
+
+              if (claim.count === 0) {
+                logger.warn(
+                  { orderId: order.id, chargeId: charge.id },
+                  'charge.refunded: pedido mudou de status durante a reconciliação — ignorado',
+                );
+              } else {
+                await prisma.$transaction(async (tx) => {
+                  await inventoryService.releaseOrderStock(
+                    tx,
+                    order.id,
+                    order.items.map((item) => ({
+                      productId: item.productId,
+                      quantity: item.quantity,
+                    })),
+                    order.status,
+                    `Refund via Stripe Dashboard reconciled for order ${order.id} (charge: ${charge.id})`,
+                  );
+
+                  if (order.couponId) {
+                    await releaseCouponUsage(tx, order.couponId);
+                  }
+                });
+
+                await cacheInvalidatePattern('products:*');
+                logger.warn(
+                  { orderId: order.id, chargeId: charge.id },
+                  'Reembolso total feito fora da API (Dashboard/banco) reconciliado — estoque liberado',
+                );
+              }
+            }
+          } else {
+            // Reembolso parcial (amount_refunded < amount): nunca libera
+            // estoque, só registra o valor já devolvido.
+            await prisma.order.update({
+              where: { id: order.id },
+              data: {
+                paymentStatus: 'PARTIALLY_REFUNDED',
+                refundedAmount: new Prisma.Decimal(charge.amount_refunded / 100),
+              },
+            });
+            logger.info(
+              { orderId: order.id, chargeId: charge.id, amountRefunded: charge.amount_refunded },
+              'Reembolso parcial reconciliado via webhook',
+            );
+          }
+        }
+      }
+    }
+
+    if (event.type === 'charge.dispute.created') {
+      const dispute = event.data.object;
+      const paymentIntentId =
+        typeof dispute.payment_intent === 'string'
+          ? dispute.payment_intent
+          : (dispute.payment_intent?.id ?? null);
+
+      if (!paymentIntentId) {
+        logger.warn(
+          { disputeId: dispute.id, eventId: event.id },
+          'Webhook charge.dispute.created sem payment_intent associado',
+        );
+      } else {
+        const order = await prisma.order.findUnique({ where: { paymentIntentId } });
+
+        if (!order) {
+          logger.warn(
+            { paymentIntentId, disputeId: dispute.id, eventId: event.id },
+            'Webhook charge.dispute.created sem pedido correspondente (órfão)',
+          );
+        } else {
+          // Só sinaliza a disputa — NÃO mexe em estoque aqui. O lojista pode
+          // vencer a disputa (charge.dispute.closed com status 'won'), então
+          // liberar estoque neste ponto seria prematuro.
+          await prisma.order.update({
+            where: { id: order.id },
+            data: { paymentStatus: 'DISPUTED' },
+          });
+          logger.warn(
+            { orderId: order.id, disputeId: dispute.id, reason: dispute.reason },
+            'Disputa (chargeback) aberta para pedido — nenhum e-mail de alerta de admin configurado, apenas log',
+          );
+        }
+      }
+    }
+
+    if (event.type === 'charge.dispute.closed') {
+      const dispute = event.data.object;
+      const paymentIntentId =
+        typeof dispute.payment_intent === 'string'
+          ? dispute.payment_intent
+          : (dispute.payment_intent?.id ?? null);
+
+      if (!paymentIntentId) {
+        logger.warn(
+          { disputeId: dispute.id, eventId: event.id },
+          'Webhook charge.dispute.closed sem payment_intent associado',
+        );
+      } else {
+        const order = await prisma.order.findUnique({
+          where: { paymentIntentId },
+          include: { items: true },
+        });
+
+        if (!order) {
+          logger.warn(
+            { paymentIntentId, disputeId: dispute.id, eventId: event.id },
+            'Webhook charge.dispute.closed sem pedido correspondente (órfão)',
+          );
+        } else if (dispute.status === 'won') {
+          await prisma.order.update({
+            where: { id: order.id },
+            data: { paymentStatus: 'SUCCEEDED' },
+          });
+          logger.info(
+            { orderId: order.id, disputeId: dispute.id },
+            'Disputa vencida pelo lojista — pagamento revalidado como SUCCEEDED',
+          );
+        } else if (dispute.status === 'lost') {
+          if (order.status === 'REFUNDED') {
+            // Já estornado (ex.: reembolso total processado antes da
+            // disputa se resolver) — nada a liberar de novo.
+            logger.warn(
+              { orderId: order.id, disputeId: dispute.id },
+              'Disputa perdida mas pedido já estava REFUNDED — sem liberação de estoque duplicada',
+            );
+          } else {
+            // Disputa perdida: perda total do valor. Reivindica REFUNDED
+            // atomicamente e libera estoque com o mesmo padrão do
+            // refund-controller.ts — nunca decrementa/libera duas vezes.
+            const claim = await prisma.order.updateMany({
+              where: { id: order.id, status: order.status },
+              data: {
+                status: 'REFUNDED',
+                paymentStatus: 'REFUNDED',
+                refundedAmount: new Prisma.Decimal(chargedTotalCents(order) / 100),
+              },
+            });
+
+            if (claim.count === 0) {
+              logger.warn(
+                { orderId: order.id, disputeId: dispute.id },
+                'Disputa perdida: pedido mudou de status durante a reconciliação — ignorado',
+              );
+            } else {
+              await prisma.$transaction(async (tx) => {
+                await inventoryService.releaseOrderStock(
+                  tx,
+                  order.id,
+                  order.items.map((item) => ({
+                    productId: item.productId,
+                    quantity: item.quantity,
+                  })),
+                  order.status,
+                  `Dispute lost for order ${order.id} (dispute: ${dispute.id})`,
+                );
+
+                if (order.couponId) {
+                  await releaseCouponUsage(tx, order.couponId);
+                }
+              });
+
+              await cacheInvalidatePattern('products:*');
+              logger.warn(
+                { orderId: order.id, disputeId: dispute.id, reason: dispute.reason },
+                'Disputa perdida — pedido estornado e estoque liberado',
+              );
+            }
+          }
+        } else {
+          logger.info(
+            { orderId: order.id, disputeId: dispute.id, status: dispute.status },
+            'Disputa fechada com status intermediário — nenhuma ação de estoque/pagamento',
+          );
+        }
+      }
     }
   } catch (err) {
     // O processamento falhou após reivindicar o evento. Liberamos a claim para

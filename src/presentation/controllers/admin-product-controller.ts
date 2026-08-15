@@ -7,12 +7,17 @@ import type {
 } from '../schemas/admin-product-schemas.js';
 import { successResponse } from '../../shared/utils/response.js';
 import { NotFoundError, ConflictError } from '../../domain/errors/app-error.js';
-import { cacheInvalidatePattern } from '../../infra/cache/cache-utils.js';
+import { cacheDelete, cacheInvalidatePattern } from '../../infra/cache/cache-utils.js';
+import { SITEMAP_CACHE_KEY } from '../../shared/utils/sitemap.js';
 
 const productRepository = new PrismaProductRepository();
 
 async function invalidateProductCache(): Promise<void> {
   await cacheInvalidatePattern('products:*');
+  // Criar/editar/excluir produto pode mudar as URLs de /produto/<slug> e as
+  // categorias listadas em /produtos?category=<slug> — invalida o sitemap
+  // cacheado junto, para nunca servir XML desatualizado por até 1h.
+  await cacheDelete(SITEMAP_CACHE_KEY);
 }
 
 function generateSlug(name: string): string {

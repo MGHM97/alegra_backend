@@ -32,6 +32,16 @@ const envSchema = z.object({
   SMTP_USER: z.string().default(''),
   SMTP_PASS: z.string().default(''),
   SMTP_FROM: z.string().default('Alegra Festas <noreply@alegrafestas.com.br>'),
+  // URL pública do site (frontend), usada para montar links absolutos em
+  // conteúdo gerado pelo backend (GET /sitemap.xml, e-mail de lembrete de
+  // avaliação pós-entrega). Distinta de CORS_ORIGIN (que pode ter múltiplas
+  // origens separadas por vírgula e serve a um propósito de segurança, não
+  // de link building).
+  PUBLIC_SITE_URL: z.string().url().default('http://localhost'),
+  // Frete grátis progressivo (ver shipping-controller.ts), em REAIS. Zona
+  // "local" = Manaus (CEP 69000-000 a 69099-999); "national" = demais CEPs.
+  FREE_SHIPPING_THRESHOLD_LOCAL: z.coerce.number().nonnegative().default(150),
+  FREE_SHIPPING_THRESHOLD_NATIONAL: z.coerce.number().nonnegative().default(400),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -82,6 +92,10 @@ function assertProductionSafety(env: Env): void {
 
   if (!env.SMTP_USER || !env.SMTP_PASS) {
     errors.push('SMTP_USER/SMTP_PASS são obrigatórios em produção (redefinição de senha depende de e-mail).');
+  }
+
+  if (/localhost|127\.0\.0\.1/.test(env.PUBLIC_SITE_URL)) {
+    errors.push('PUBLIC_SITE_URL aponta para localhost em produção. Defina o domínio público do site.');
   }
 
   if (errors.length > 0) {
