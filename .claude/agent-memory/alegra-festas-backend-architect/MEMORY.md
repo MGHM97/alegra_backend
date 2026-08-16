@@ -3,3 +3,4 @@
 - [Padrão de paginação por cursor](pagination-pattern.md) — replicar o padrão admin, mas com checagem de posse do cursor em recursos escopados por usuário
 - [Docker (Dockerfile + serviço api)](docker-deployment.md) — stages, gotchas de Alpine/musl (openssl, bcrypt), volumes e rede do compose
 - [Sort + cursor de GET /v1/products](product-sort-cursor.md) — coluna GENERATED STORED para discount, cursor {v,v2,id}, cursor legado uuid força newest
+- [Kit de deploy do piloto](pilot-deploy-kit.md) — deploy/ vive no repo do back (raiz não é git), TRUST_PROXY_HOPS, mem_limit vs deploy.resources, fix de X-Forwarded-Proto no nginx atrás do Caddy, seed:pilot

@@ -24,6 +24,17 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3333),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  // Número de proxies reversos confiáveis IMEDIATAMENTE na frente da API,
+  // repassado ao `trustProxy` do Fastify (ver app.ts). Cada hop além do
+  // configurado é ignorado ao calcular `request.ip` a partir de
+  // X-Forwarded-For — subestimar permite que o cliente forje o IP usado
+  // pelo rate limiting; superestimar permite o mesmo forjando hops extras.
+  // Topologia padrão do compose (docker-compose.yml raiz): só o nginx do
+  // serviço `web` fica entre o cliente e a API -> 1. Com Caddy também na
+  // frente do nginx para TLS (docker-compose.prod.yml, VPS com domínio
+  // próprio): client -> Caddy -> nginx -> api -> 2. Mesma contagem para
+  // Cloudflare/ALB + nginx.
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
   BCRYPT_ROUNDS: z.coerce.number().int().min(10).max(20).default(12),
   STRIPE_SECRET_KEY: z.string().min(1, 'STRIPE_SECRET_KEY is required'),
   STRIPE_WEBHOOK_SECRET: z.string().min(1, 'STRIPE_WEBHOOK_SECRET is required'),

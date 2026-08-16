@@ -9,6 +9,7 @@ import { NotFoundError, ValidationError } from '../../domain/errors/app-error.js
 import type { ForgotPasswordInput, ResetPasswordInput } from '../schemas/password-reset-schemas.js';
 import { EmailService } from '../../application/services/email-service.js';
 import { env } from '../../infra/config/env.js';
+import { logger } from '../../shared/utils/logger.js';
 
 const userRepository = new PrismaUserRepository();
 const emailService = new EmailService();
@@ -52,7 +53,17 @@ export async function forgotPasswordHandler(
   const frontendOrigin = (env.CORS_ORIGIN.split(',')[0] ?? env.CORS_ORIGIN).trim();
   const resetUrl = `${frontendOrigin}/reset-password?token=${plainToken}`;
 
-  await emailService.sendPasswordReset(email, user.name, resetUrl);
+  // Best-effort: uma falha transitória de SMTP (credencial errada, timeout,
+  // provedor fora do ar) não pode derrubar a request com 500 — o token já
+  // está salvo no banco e continua válido por 1h, então o usuário pode
+  // tentar "esqueci minha senha" de novo sem qualquer efeito colateral.
+  // Também mantém a resposta idêntica ao caminho "e-mail não cadastrado"
+  // acima, sem vazar se o envio falhou por causa de uma conta específica.
+  try {
+    await emailService.sendPasswordReset(email, user.name, resetUrl);
+  } catch (err) {
+    logger.warn({ err, userId: user.id }, 'Falha ao enviar e-mail de recuperação de senha (SMTP)');
+  }
 
   void reply
     .status(200)

@@ -1,0 +1,60 @@
+# =============================================================================
+# Alegra Festas — Caddyfile (TLS automático na frente do nginx `web`).
+#
+# Usado por docker-compose.prod.yml (serviço `caddy`, monta este arquivo em
+# /etc/caddy/Caddyfile). SITE_DOMAIN vem do .env da RAIZ (env_file: .env no
+# serviço `caddy`) — ver deploy/.env.example.
+#
+# Caddy provisiona/renova certificados Let's Encrypt automaticamente para
+# QUALQUER hostname público válido apontado para este servidor — inclusive
+# sslip.io (ver bloco comentado abaixo), que resolve como domínio real via
+# DNS. Não precisa de client/servidor ACME separado nem de certbot.
+#
+# IMPORTANTE sobre X-Forwarded-*: a diretiva `reverse_proxy` do Caddy já
+# define X-Forwarded-For, X-Forwarded-Proto e X-Forwarded-Host automatica-
+# mente a partir da conexão real do cliente — não redeclare `header_up
+# X-Forwarded-For` manualmente (documentação oficial do Caddy, reverse_proxy):
+# fazer isso substituiria o valor automático em vez de completá-lo, e é
+# desnecessário. O nginx (`web`) só precisa REPASSAR o que o Caddy já
+# manda — ver `alegra_frontend/nginx.conf`, que usa
+# `proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;` (não
+# `$scheme`, que dentro da rede interna seria sempre "http").
+#
+# HTTP -> HTTPS: automático. Qualquer site block abaixo sem esquema
+# `http://` explícito já ativa HTTPS automático E o redirecionamento do
+# tráfego :80 -> :443 (Caddy adiciona esse redirect implicitamente).
+# =============================================================================
+
+{
+	# Descomente para receber avisos de expiração/erros de certificado por
+	# e-mail (opcional, recomendado para produção real além do piloto):
+	# email seu-email@SITE_DOMAIN
+}
+
+{$SITE_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		# HSTS: força HTTPS no navegador por 1 ano. Só ative depois de
+		# confirmar que o certificado está funcionando de ponta a ponta —
+		# reverter é lento (o navegador lembra o header por max-age).
+		Strict-Transport-Security "max-age=31536000"
+	}
+
+	reverse_proxy web:80
+}
+
+# -----------------------------------------------------------------------
+# Alternativa SEM domínio próprio: sslip.io resolve <qualquer-coisa>.IP.
+# sslip.io para o próprio IP do servidor — funciona exatamente igual a um
+# domínio real para fins de ACME HTTP-01 (Caddy consegue emitir certificado
+# Let's Encrypt normalmente). Troque 1-2-3-4 pelo IP real do VPS (com
+# hífens no lugar dos pontos) e "alegra" pelo prefixo que preferir.
+# -----------------------------------------------------------------------
+# alegra.1-2-3-4.sslip.io {
+# 	encode zstd gzip
+# 	header {
+# 		Strict-Transport-Security "max-age=31536000"
+# 	}
+# 	reverse_proxy web:80
+# }

@@ -1,0 +1,136 @@
+# =============================================================================
+# Alegra Festas — override de PRODUÇÃO/PILOTO (Caddy + HTTPS na frente do
+# nginx, limites de memória para VPS pequena, logging limitado).
+#
+# Uso (a partir da pasta que contém docker-compose.yml, alegra_backend/ e
+# alegra_frontend/ — ver deploy/DEPLOY.md para o layout completo):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# O que este arquivo NÃO repete de propósito: `restart: unless-stopped` em
+# `api`/`postgres`/`redis`/`backup`/`web` já vem do compose base
+# (alegra_backend/docker-compose.yml e alegra_frontend/docker-compose.yml) —
+# reescrever o mesmo valor aqui só criaria uma segunda fonte de verdade para
+# manter sincronizada. Só `caddy` (serviço novo) precisa declarar restart.
+#
+# ATENÇÃO memória (VPS pequena): api 512M + postgres 1G + redis 256M +
+# web 128M + caddy 128M = 2048M — numa VPS de EXATAMENTE 2GB isso não deixa
+# folga nenhuma para o SO/daemon do Docker (que também precisam de RAM) e o
+# host vai começar a fazer swap/OOM-kill sob carga. Estes valores assumem
+# uma VPS de 4GB+ com conforto. Numa VPS de 2GB, reduza postgres para
+# ~640-768M (ajuste `shared_buffers`/`work_mem` do lado do Postgres também
+# se fizer isso) ou suba para 4GB antes de ir a público com clientes reais.
+#
+# Cada serviço declara o limite DUAS vezes de propósito: `deploy.resources.
+# limits.memory` é o campo canônico da Compose Spec, mas o `docker compose
+# up` normal (fora do Swarm, sem a flag `--compatibility`) o IGNORA
+# silenciosamente — só é honrado por `docker stack deploy`. Quem realmente
+# aplica o cgroup de memória num `docker compose up` comum é o atributo
+# legado `mem_limit`. Mantemos os dois: `mem_limit` garante o limite de
+# fato nesta VPS; `deploy.resources.limits.memory` documenta a intenção no
+# formato padrão, caso o setup migre para Swarm/`--compatibility` no futuro.
+# =============================================================================
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp' # HTTP/3 (QUIC)
+    env_file:
+      - .env
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      web:
+        condition: service_healthy
+    mem_limit: 128m
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  # Só o Caddy expõe porta no host a partir daqui — o nginx do `web` passa
+  # a ser acessado somente pela rede interna (Caddy -> web:80).
+  web:
+    ports: !override []
+    mem_limit: 128m
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  api:
+    environment:
+      # Client -> Caddy -> nginx (web) -> api = 2 hops confiáveis (ver
+      # TRUST_PROXY_HOPS em alegra_backend/src/infra/config/env.ts).
+      TRUST_PROXY_HOPS: '2'
+    mem_limit: 512m
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  postgres:
+    mem_limit: 1g
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  redis:
+    mem_limit: 256m
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  backup:
+    # pg_dump uma vez por dia + um loop `sleep` — não precisa de limite de
+    # memória dedicado (uso residual, poucos MB), só o log cap.
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  migrate:
+    # One-shot (roda e sai antes do `api` subir) — log cap por consistência.
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+volumes:
+  caddy_data:
+  caddy_config:

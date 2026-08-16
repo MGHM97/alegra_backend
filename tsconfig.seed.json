@@ -13,6 +13,6 @@
     "resolveJsonModule": true,
     "isolatedModules": true
   },
-  "include": ["prisma/seed.ts"],
+  "include": ["prisma/seed.ts", "prisma/seed-pilot.ts"],
   "exclude": ["node_modules", "dist"]
 }

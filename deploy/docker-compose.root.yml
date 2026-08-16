@@ -1,0 +1,68 @@
+# =============================================================================
+# Alegra Festas — compose RAIZ (produção / staging / smoke local)
+#
+# ATENÇÃO: este arquivo é a cópia VERSIONADA (no repo do backend) do
+# docker-compose.yml que vive na pasta pai `Alegra Festas/` do ambiente de
+# desenvolvimento local — essa pasta pai não é um repositório git. No
+# servidor, copie este arquivo para a raiz do deploy como `docker-compose.yml`
+# (ver deploy/DEPLOY.md, passo 2). Se editar a topologia base, edite AQUI e
+# recopie — não o contrário.
+#
+# Une os dois compose filhos numa única rede, na topologia preparada para
+# escalar horizontalmente:
+#
+#   web (nginx :80)  ──proxy /v1/──▶  api (fastify :3333, replicável)
+#                                       ├──▶ postgres
+#                                       └──▶ redis
+#
+# - O nginx do `web` é o hop confiável que `TRUST_PROXY_HOPS` (padrão 1,
+#   ver alegra_backend/src/infra/config/env.ts) espera: repassa
+#   X-Forwarded-For com o IP real do cliente. Em produção com Caddy na
+#   frente do nginx (docker-compose.prod.yml, TLS), some 1 hop: use
+#   TRUST_PROXY_HOPS=2 (o override já faz isso).
+# - Same-origin: o front chama `/v1/...` no próprio host, sem CORS.
+# - Para escalar: `docker compose up -d --scale api=3` — o nginx resolve
+#   `api` via DNS interno do Docker (round-robin). Antes disso, garanta que
+#   connection_limit * réplicas < max_connections do Postgres (ver
+#   alegra_backend/.env.example) e considere PgBouncer.
+#
+# Uso local/smoke (sem HTTPS, sem Caddy):
+#   cp alegra_backend/.env.example alegra_backend/.env   # e preencha
+#   docker compose up -d --build
+#   curl -s http://localhost/health        # via nginx -> api
+#
+# Uso em produção/piloto (com Caddy + HTTPS): ver docker-compose.prod.yml
+# e deploy/DEPLOY.md.
+# =============================================================================
+name: alegra
+
+include:
+  - path: alegra_backend/docker-compose.yml
+    project_directory: alegra_backend
+  - path: alegra_frontend/docker-compose.yml
+    project_directory: alegra_frontend
+    env_file: alegra_frontend/.env.compose
+
+services:
+  # Em produção NADA além do nginx fica exposto no host: banco, cache e API
+  # só existem na rede interna. (Também evita colisão com o Postgres/Redis
+  # de desenvolvimento nas mesmas portas.) Para inspecionar, use
+  # `docker compose exec postgres psql ...`.
+  postgres:
+    ports: !override []
+  redis:
+    ports: !override []
+  api:
+    ports: !override []
+
+  # Sobrescreve apenas o necessário para o `web` conversar com o `api`
+  # pela rede interna. Os build args do front continuam vindo do compose
+  # filho / .env.compose.
+  web:
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      # Same-origin: a CSP (connect-src) e o proxy /v1/ apontam para o
+      # próprio host servido pelo nginx.
+      API_ORIGIN: ${API_ORIGIN:-http://localhost}

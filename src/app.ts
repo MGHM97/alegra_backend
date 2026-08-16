@@ -34,11 +34,12 @@ export async function buildApp() {
           ? { target: 'pino-pretty', options: { colorize: true } }
           : undefined,
     },
-    // 1 hop confiável: apenas o proxy reverso imediatamente na frente da API.
+    // Número de hops confiáveis de proxy reverso, via TRUST_PROXY_HOPS
+    // (ver infra/config/env.ts) — default 1 (só o nginx do compose).
     // NUNCA usar `true` — isso confia em toda a cadeia de X-Forwarded-For
     // enviada pelo cliente, permitindo forjar `request.ip` e anular o rate
     // limiting por IP.
-    trustProxy: 1,
+    trustProxy: env.TRUST_PROXY_HOPS,
   });
 
   fastify.addContentTypeParser(
