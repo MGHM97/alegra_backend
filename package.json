@@ -23,6 +23,7 @@
     "db:baseline": "prisma migrate resolve --applied 0_init",
     "seed": "tsx prisma/seed.ts",
     "seed:pilot": "tsx prisma/seed-pilot.ts",
+    "seed:samples": "tsx prisma/seed-samples.ts",
     "setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
     "setup:prod": "prisma generate && prisma migrate deploy"
   },

@@ -89,6 +89,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      # `yarn seed:samples` (ver prisma/seed-samples.ts) grava SVGs de
+      # produto em public/uploads/products dentro deste container — sem o
+      # MESMO volume nomeado do serviço `api`, os arquivos morreriam com o
+      # container (`docker compose run --rm`) e o `api` nunca os veria,
+      # gerando URLs de imagem 404 em produção. `prisma migrate deploy`
+      # (comando padrão deste serviço) não grava nada aqui, então montar o
+      # volume não muda o comportamento do `up` normal.
+      - uploads:/app/public/uploads
     restart: "no"
 
   api:
