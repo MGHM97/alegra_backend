@@ -196,7 +196,7 @@ Rodar de novo é seguro (idempotente) e NÃO troca as senhas, a menos que
 
 ```bash
 curl -I https://SEU_DOMINIO           # 200 (ou 30x), certificado válido
-curl -I https://SEU_DOMINIO/health    # via nginx -> api, 200
+curl https://SEU_DOMINIO/health       # via nginx -> api: {"status":"ok"} (nginx faz proxy de /health)
 ```
 
 Pelo navegador:
