@@ -13,13 +13,11 @@
 # reescrever o mesmo valor aqui só criaria uma segunda fonte de verdade para
 # manter sincronizada. Só `caddy` (serviço novo) precisa declarar restart.
 #
-# ATENÇÃO memória (VPS pequena): api 512M + postgres 1G + redis 256M +
-# web 128M + caddy 128M = 2048M — numa VPS de EXATAMENTE 2GB isso não deixa
-# folga nenhuma para o SO/daemon do Docker (que também precisam de RAM) e o
-# host vai começar a fazer swap/OOM-kill sob carga. Estes valores assumem
-# uma VPS de 4GB+ com conforto. Numa VPS de 2GB, reduza postgres para
-# ~640-768M (ajuste `shared_buffers`/`work_mem` do lado do Postgres também
-# se fizer isso) ou suba para 4GB antes de ir a público com clientes reais.
+# Memória (calibrado para VPS de 2GB, ex. Lightsail US$12): api 384M +
+# postgres 512M + redis 128M + web 128M + caddy 128M = 1280M, deixando ~700M
+# para SO/Docker. Para poucos usuários (piloto) sobra; com 4GB+ pode dobrar
+# postgres (1G) e api (512M). Recomenda-se também 2GB de swap no host (ver
+# DEPLOY.md, passo 1) como colchão contra OOM-kill em picos de build.
 #
 # Cada serviço declara o limite DUAS vezes de propósito: `deploy.resources.
 # limits.memory` é o campo canônico da Compose Spec, mas o `docker compose
@@ -79,6 +77,18 @@ services:
       # Client -> Caddy -> nginx (web) -> api = 2 hops confiáveis (ver
       # TRUST_PROXY_HOPS em alegra_backend/src/infra/config/env.ts).
       TRUST_PROXY_HOPS: '2'
+    mem_limit: 384m
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  postgres:
     mem_limit: 512m
     deploy:
       resources:
@@ -90,24 +100,12 @@ services:
         max-size: '10m'
         max-file: '3'
 
-  postgres:
-    mem_limit: 1g
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-    logging:
-      driver: json-file
-      options:
-        max-size: '10m'
-        max-file: '3'
-
   redis:
-    mem_limit: 256m
+    mem_limit: 128m
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 128M
     logging:
       driver: json-file
       options:

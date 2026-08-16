@@ -12,38 +12,55 @@
 
 | Item | Onde conseguir | Já tem? |
 |---|---|---|
-| **VPS Ubuntu 22.04/24.04, ≥ 4 GB RAM** | Recomendado: **Hostinger VPS KVM 2 (São Paulo)** — paga em real, painel pt-BR. Alternativas equivalentes: Vultr / Linode / Lightsail em São Paulo. Ao criar, escolha o template **"Ubuntu 24.04"** puro (não o "Docker" — instalaremos a versão oficial). | ☐ |
+| **VPS Ubuntu 22.04/24.04, ≥ 2 GB RAM** | **AWS Lightsail 2 GB em São Paulo** (US$ 12/mês, coberto pelos créditos da conta gratuita) — passo a passo no bloco 1A. Alternativas: Oracle Free (SP, ARM), Hetzner, Vultr/Linode SP. | ☐ |
 | **Domínio** | `alegrafestas.com.br` no registro.br (~R$ 40/ano) — ou, para começar hoje, usar `sslip.io` (grátis, HTTPS real, troca depois sem redeploy). | ☐ |
 | **Chaves Stripe de teste** | `pk_test_…` e `sk_test_…` (você já tem). O `whsec_` do webhook será criado no passo 6. | ✔ |
 | **SMTP** para e-mails (recuperação de senha, "avalie sua compra") | Opção A: **Brevo** (grátis 300/dia): criar conta → SMTP & API → gerar chave SMTP. Opção B: Gmail `alegrafestascomercial@gmail.com` → Segurança → "Senhas de app" (exige verificação em 2 etapas). | ☐ |
 | **Senhas do piloto** | Uma para o **admin** e uma para o **cliente de teste** — ≥ 12 caracteres cada. Anote. | ☐ |
 | **Push dos repositórios** | Os dois repos precisam estar no GitHub atualizados: `git -C alegra_backend push origin development` e `git -C alegra_frontend push origin development` (na sua máquina). | ☐ |
 
-> **Nota sobre memória:** os limites do compose de produção somam ~2 GB. Um VPS de exatamente 2 GB funciona apertado; **4 GB é o mínimo confortável**. O KVM 2 da Hostinger tem 8 GB.
+> **Nota sobre memória:** o compose de produção está calibrado para **2 GB** (limites somam ~1,3 GB + swap de 2 GB criado no bloco 2). Uma instância de 2 GB é suficiente para o piloto; 4 GB dá folga extra.
 
 ---
 
 ## 1 · Criar o VPS e apontar o domínio (≈ 10 min)
 
-1. Crie o VPS. Anote o **IP público** (ex.: `187.45.12.34`) e a **senha de root** (ou cadastre sua chave SSH no painel — melhor).
-2. **Se tiver domínio:** no painel DNS do registro.br (ou onde o domínio estiver), crie:
-   - `A` · nome `@` · valor `«IP do VPS»`
-   - `A` · nome `www` · valor `«IP do VPS»`
-   
-   Propagação leva de 5 min a algumas horas. Teste com `nslookup alegrafestas.com.br` — deve devolver o IP.
-3. **Se NÃO tiver domínio:** seu endereço será `alegra.«IP-com-hífens».sslip.io` — ex.: IP `187.45.12.34` → `alegra.187-45-12-34.sslip.io`. Não precisa configurar nada.
+### 1A · AWS Lightsail (caminho recomendado com a conta gratuita da AWS)
 
-**✔ Confirmar:** `ping «SEU_DOMINIO»` responde com o IP do VPS.
+1. No console da AWS, busque **Lightsail** (barra de busca no topo) → abre um painel próprio, mais simples que o EC2.
+2. **Create instance**:
+   - **Region:** `São Paulo (sa-east-1)`, Zone A. (Não importa que o console principal esteja em Ohio — o Lightsail escolhe a região aqui.)
+   - **Platform:** Linux/Unix → **Blueprint:** aba "OS Only" → **Ubuntu 24.04 LTS**.
+   - **SSH key:** "Create new" (baixe o `.pem` e guarde) — ou use a "Default" e baixe-a em Account → SSH keys.
+   - **Plan:** **US$ 12/mês — 2 GB RAM, 2 vCPU, 60 GB SSD** (6 meses ≈ US$ 72, dentro dos créditos; alguns planos têm os 3 primeiros meses grátis — se aparecer, melhor ainda). Não pegue o de 512 MB/1 GB.
+   - **Name:** `alegra-piloto` → **Create instance**. Leva ~1 min para ficar "Running".
+3. **IP fixo:** aba **Networking** da instância → **Create static IP** → attach à `alegra-piloto` (grátis enquanto anexado; sem isso o IP muda a cada reinício e quebra o DNS/certificado).
+4. **Firewall:** ainda em Networking → IPv4 Firewall → **Add rule** → `HTTPS` (porta 443). SSH 22 e HTTP 80 já vêm liberados.
+5. Anote o **IP estático**. O usuário SSH é **`ubuntu`** (não `root`):
+   ```bash
+   chmod 400 ~/Downloads/«sua-chave».pem
+   ssh -i ~/Downloads/«sua-chave».pem ubuntu@«IP estático»
+   sudo -i          # vira root para o bloco 2
+   ```
+   (Alternativa sem chave: botão "Connect using SSH" no painel abre um terminal no navegador — serve para o bloco 2 inteiro.)
+6. **Alerta de gasto (2 min, vale a pena):** console AWS → Billing → Budgets → Create budget → "Zero spend budget" com seu e-mail. Assim você é avisado se algo sair dos créditos.
+
+### 1B · Outros provedores (Oracle Free, Hetzner, Vultr, Linode)
+
+Crie a VM Ubuntu 22.04/24.04 (≥ 2 GB), libere as portas 22/80/443 no firewall do painel, anote o IP. Entre como `root` (ou `ubuntu` + `sudo -i`).
+
+### 1C · Domínio
+
+- **Com domínio:** no DNS (registro.br ou onde estiver): `A` · `@` · `«IP»` e `A` · `www` · `«IP»`. Propaga em minutos a algumas horas (`nslookup «dominio»` deve devolver o IP).
+- **Sem domínio:** use `alegra.«IP-com-hífens».sslip.io` — ex.: IP `54.207.10.20` → `alegra.54-207-10-20.sslip.io`. HTTPS real, nada a configurar; troca para o domínio depois só editando `.env`.
+
+**✔ Confirmar:** `ping «SEU_DOMINIO»` responde com o IP da instância; `ssh` entra.
 
 ---
 
 ## 2 · Preparar o servidor (≈ 10 min)
 
-No seu computador, entre no VPS:
-
-```bash
-ssh root@«IP do VPS»
-```
+No seu computador, entre no VPS (Lightsail: `ssh -i chave.pem ubuntu@«IP»` e depois `sudo -i`; outros: `ssh root@«IP»`).
 
 Cole em bloco (o instalador oficial do Docker é obrigatório — os pacotes do Ubuntu não suportam `include:`/`!override` que o compose usa):
 
@@ -55,10 +72,13 @@ adduser deploy                    # crie uma senha; pode deixar os outros campos
 usermod -aG docker deploy
 ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp
 ufw --force enable
+# swap de 2 GB — colchão para builds numa máquina de 2 GB
+fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
 su - deploy
 ```
 
-**✔ Confirmar:** `docker compose version` mostra `v2.24` ou maior, e você está como usuário `deploy` (`whoami`).
+**✔ Confirmar:** `docker compose version` mostra `v2.24` ou maior, `free -h` mostra 2 GB de swap, e você está como usuário `deploy` (`whoami`).
 
 ---
 

@@ -63,6 +63,9 @@ ufw allow 22/tcp
 ufw allow 80/tcp
 ufw allow 443/tcp
 ufw --force enable
+# Swap de 2GB (colchão de memória para builds/picos numa VPS de 2GB):
+fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
 # A partir daqui, troque para o usuário deploy:
 su - deploy
@@ -166,11 +169,10 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f caddy
 # espere uma linha "certificate obtained successfully" (ou similar) do Caddy
 ```
 
-> **Aviso de memória (VPS pequena):** o override de produção soma limites
-> de api 512M + postgres 1G + redis 256M + web 128M + caddy 128M = 2048M.
-> Numa VPS de EXATAMENTE 2GB isso não deixa folga para o SO/Docker — prefira
-> 4GB, ou reduza `postgres` para ~640-768M em `docker-compose.prod.yml`
-> antes de subir (ver comentário no topo do arquivo).
+> **Memória:** os limites do override somam 1280M (api 384M + postgres 512M +
+> redis 128M + web 128M + caddy 128M) — calibrado para VPS de **2GB** (ex.
+> Lightsail US$12) com ~700M de folga. Com 4GB+ pode dobrar postgres/api.
+> Crie 2GB de swap no host (passo 1) como colchão para picos de build.
 
 ---
 
