@@ -6,6 +6,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
+    setupFiles: ['tests/vitest.setup.ts'],
     testTimeout: 15000,
     hookTimeout: 15000,
     // Testes de integração compartilham o mesmo Postgres/Redis. Rodar

@@ -36,61 +36,127 @@ const LOGIN_WINDOW_SECONDS = 900; // 15 minutes
  * então o corpo ainda não tem tipo garantido — daí o type guard manual em vez
  * de confiar no shape do Zod.
  */
-function extractLoginIdentifier(body: unknown): string | null {
-  if (typeof body !== 'object' || body === null || !('identifier' in body)) {
+function extractBodyIdentifier(body: unknown, field: string): string | null {
+  if (typeof body !== 'object' || body === null || !(field in body)) {
     return null;
   }
-  const value = (body as Record<string, unknown>).identifier;
+  const value = (body as Record<string, unknown>)[field];
   if (typeof value !== 'string' || value.trim().length === 0) {
     return null;
   }
   return value.trim().toLowerCase();
 }
 
-async function loginRateLimiter(
-  request: FastifyRequest,
-  _reply: FastifyReply,
-): Promise<void> {
-  try {
-    const redis = await getRedisClient();
-
-    // Duas chaves independentes: por IP e por identificador normalizado
-    // (e-mail/usuário em minúsculas). `trustProxy: 1` já limita quem pode
-    // forjar `request.ip`, mas a chave por identificador é uma segunda
-    // camada — um IP fabricado sozinho não basta para burlar o limite, pois
-    // o identificador vem do corpo da requisição, não de um header.
-    const keys = [`ratelimit:login:${request.ip}`];
-    const identifier = extractLoginIdentifier(request.body);
-    if (identifier) {
-      keys.push(`ratelimit:login:identifier:${identifier}`);
-    }
-
-    for (const key of keys) {
-      const current = await redis.incr(key);
-      if (current === 1) {
-        await redis.expire(key, LOGIN_WINDOW_SECONDS);
-      }
-      if (current > LOGIN_MAX_ATTEMPTS) {
-        const ttl = await redis.ttl(key);
-        throw new AppError(
-          `Muitas tentativas de login. Tente novamente em ${Math.ceil(ttl / 60)} minuto(s).`,
-          429,
-          'LOGIN_RATE_LIMITED',
-        );
-      }
-    }
-  } catch (err) {
-    if (err instanceof AppError) throw err;
-    // Redis down — fail-open (disponibilidade > limite de tentativas), mas
-    // registra o incidente: sem isso, um Redis fora do ar libera login sem
-    // rate limit silenciosamente e ninguém percebe.
-    request.log.warn({ err }, 'Login rate limiter indisponível — requisição liberada sem limite');
-  }
+interface AuthRateLimitOptions {
+  /** Prefixo da chave no Redis e nome legível para logs/mensagens. */
+  scope: string;
+  /** Limite por identificador (e-mail/usuário) — a chave "apertada". */
+  maxAttempts: number;
+  /**
+   * Limite por IP. Deve ser mais folgado que `maxAttempts`: redes NAT (o Wi-Fi
+   * da loja, uma empresa) compartilham um IP entre muitos usuários legítimos.
+   * Se omitido, usa `maxAttempts`.
+   */
+  maxAttemptsPerIp?: number;
+  windowSeconds: number;
+  /** Campo do body usado como segunda chave (e-mail/identifier); opcional. */
+  identifierField?: string;
+  message: string;
+  code: string;
 }
+
+/**
+ * Fábrica de rate limiter para rotas sensíveis de autenticação. Duas chaves
+ * independentes: por IP (`trustProxy` já limita forja de X-Forwarded-For) e,
+ * quando houver, por identificador vindo do BODY (e-mail/usuário) — um IP
+ * fabricado sozinho não basta para burlar o limite. Fail-open com warn se o
+ * Redis cair (disponibilidade > limite), como já era no login.
+ */
+function createAuthRateLimiter(opts: AuthRateLimitOptions) {
+  return async function authRateLimiter(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
+    try {
+      const redis = await getRedisClient();
+      const keys: Array<{ key: string; max: number }> = [
+        { key: `ratelimit:${opts.scope}:${request.ip}`, max: opts.maxAttemptsPerIp ?? opts.maxAttempts },
+      ];
+      if (opts.identifierField) {
+        const identifier = extractBodyIdentifier(request.body, opts.identifierField);
+        if (identifier) keys.push({ key: `ratelimit:${opts.scope}:identifier:${identifier}`, max: opts.maxAttempts });
+      }
+      for (const { key, max } of keys) {
+        const current = await redis.incr(key);
+        if (current === 1) await redis.expire(key, opts.windowSeconds);
+        if (current > max) {
+          const ttl = await redis.ttl(key);
+          throw new AppError(
+            `${opts.message} Tente novamente em ${Math.max(1, Math.ceil(ttl / 60))} minuto(s).`,
+            429,
+            opts.code,
+          );
+        }
+      }
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      request.log.warn({ err, scope: opts.scope }, 'Rate limiter de autenticação indisponível — requisição liberada sem limite');
+    }
+  };
+}
+
+const loginRateLimiter = createAuthRateLimiter({
+  scope: 'login',
+  maxAttempts: LOGIN_MAX_ATTEMPTS,
+  // Por IP mais folgado: 5 erros derrubariam o Wi-Fi inteiro da loja.
+  maxAttemptsPerIp: LOGIN_MAX_ATTEMPTS * 4,
+  windowSeconds: LOGIN_WINDOW_SECONDS,
+  identifierField: 'identifier',
+  message: 'Muitas tentativas de login.',
+  code: 'LOGIN_RATE_LIMITED',
+});
+
+// Recuperação de senha: 5 pedidos por e-mail/IP a cada 15 min —
+// evita spam de e-mail e enumeração por tempo de resposta.
+const forgotPasswordRateLimiter = createAuthRateLimiter({
+  scope: 'forgot-password',
+  maxAttempts: 5,
+  maxAttemptsPerIp: 20,
+  windowSeconds: 15 * 60,
+  identifierField: 'email',
+  message: 'Muitos pedidos de recuperação de senha.',
+  code: 'FORGOT_PASSWORD_RATE_LIMITED',
+});
+
+// Reset: o token é UUID hasheado (força bruta impraticável), mas limitar
+// tentativas por IP fecha qualquer varredura.
+const resetPasswordRateLimiter = createAuthRateLimiter({
+  scope: 'reset-password',
+  maxAttempts: 20,
+  windowSeconds: 15 * 60,
+  message: 'Muitas tentativas de redefinição de senha.',
+  code: 'RESET_PASSWORD_RATE_LIMITED',
+});
+
+// Cadastro: contra criação em massa de contas (bots). 20 por IP / hora.
+const registerRateLimiter = createAuthRateLimiter({
+  scope: 'register',
+  maxAttempts: 20,
+  windowSeconds: 60 * 60,
+  message: 'Muitas tentativas de cadastro.',
+  code: 'REGISTER_RATE_LIMITED',
+});
+
+// Refresh: um cliente legítimo renova ~1x a cada 15 min; 300/15min por IP
+// comporta um NAT com dezenas de usuários e ainda barra abuso.
+const refreshRateLimiter = createAuthRateLimiter({
+  scope: 'refresh',
+  maxAttempts: 300,
+  windowSeconds: 15 * 60,
+  message: 'Muitas renovações de sessão.',
+  code: 'REFRESH_RATE_LIMITED',
+});
 
 export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post('/register', {
-    preHandler: [validateBody(registerSchema)],
+    preHandler: [registerRateLimiter, validateBody(registerSchema)],
     handler: registerHandler,
   });
 
@@ -100,6 +166,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   });
 
   fastify.post('/refresh', {
+    preHandler: [refreshRateLimiter],
     handler: refreshHandler,
   });
 
@@ -123,12 +190,12 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   });
 
   fastify.post('/forgot-password', {
-    preHandler: [validateBody(forgotPasswordSchema)],
+    preHandler: [forgotPasswordRateLimiter, validateBody(forgotPasswordSchema)],
     handler: forgotPasswordHandler,
   });
 
   fastify.post('/reset-password', {
-    preHandler: [validateBody(resetPasswordSchema)],
+    preHandler: [resetPasswordRateLimiter, validateBody(resetPasswordSchema)],
     handler: resetPasswordHandler,
   });
 }
